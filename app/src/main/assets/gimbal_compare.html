@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<title>吊舱↔双目 对比验证</title>
+<style>
+:root{
+  --bg:#0a0f1e; --bg2:#0d1426; --panel:#121a2e; --panel2:#18233c; --border:#22304d;
+  --fg:#e8eefb; --muted:#8b98b2; --accent:#4f8cff; --accent2:#7c5cff;
+  --ok:#2ecc71; --warn:#f5a623; --danger:#ff5d5d; --real:#5cb3ff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(160deg,var(--bg),var(--bg2) 70%);
+  color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+header{display:flex;align-items:center;gap:12px;padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top));
+  background:rgba(18,26,46,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);flex:none}
+.logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex:none}
+header .t{font-size:16px;font-weight:700;letter-spacing:.5px}
+header .t small{display:block;font-size:10px;color:var(--muted);font-weight:400;letter-spacing:.2px;margin-top:-1px}
+header .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:5px 12px}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:#4a5870}
+.pill.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.pill.busy .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.toolbar{display:flex;gap:9px;padding:12px 18px;flex:none;align-items:center}
+button.act{height:42px;padding:0 16px;border-radius:11px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);font-size:13px;font-weight:600;cursor:pointer;transition:.14s;white-space:nowrap}
+button.act:active{transform:scale(.95)}
+button.act.ghost{background:transparent;color:var(--muted)}
+button.act.ghost:hover{border-color:var(--accent);color:var(--fg)}
+button.act.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;
+  box-shadow:0 4px 14px rgba(79,140,255,.35);font-size:14px;padding:0 22px}
+button.act.primary:hover{filter:brightness(1.1)}
+.body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden}
+.main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none}
+.main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
+.side{width:235px;min-width:0;overflow-y:auto;padding:11px;display:flex;flex-direction:column;gap:11px;
+  background:var(--bg2)}
+.side .panel{margin:0}
+.side details{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
+.side details summary{padding:10px 13px;cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600;
+  list-style:none;user-select:none}
+.side details summary::-webkit-details-marker{display:none}
+.side details[open] summary{color:var(--fg);border-bottom:1px solid var(--border)}
+.side details .panel{margin:0;border:0;border-radius:0;background:transparent;padding:11px 13px}
+@media(orientation:portrait),(max-width:560px){.body{flex-direction:column}.side{width:auto;flex:none;overflow-y:visible}}
+.hintbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;color:var(--muted);
+  background:rgba(5,7,15,.82);padding:6px 15px;border-radius:20px;pointer-events:none;white-space:nowrap;
+  border:1px solid var(--border)}
+.panel{margin:11px 18px 0;padding:13px 15px;border-radius:14px;background:var(--panel);
+  border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.25);flex:none}
+.panel h3{margin:0 0 10px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.panel h3::before{content:'';width:3px;height:13px;border-radius:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2))}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
+.field input{width:76px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);padding:0 8px;font-size:14px;text-align:right;font-family:Consolas,monospace}
+.field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
+.field input.big{width:112px}
+textarea{width:100%;height:48px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);padding:9px 11px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical}
+textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.cmp .cell{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:8px;text-align:center;
+  transition:.15s}
+.cmp .cell.real{border-color:rgba(92,179,255,.4);background:rgba(92,179,255,.06)}
+.cmp .cell.delta-ok{border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.08)}
+.cmp .cell.delta-bad{border-color:rgba(255,93,93,.5);background:rgba(255,93,93,.1)}
+.cmp .lbl{font-size:11px;color:var(--muted)}
+.cmp .val{font-size:17px;font-weight:700;font-family:Consolas,monospace;margin-top:2px;letter-spacing:-.5px}
+.cmp .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
+.cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
+.verdict{margin-top:11px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:600;
+  display:none;align-items:center;gap:8px;line-height:1.5}
+.verdict.show{display:flex}
+.verdict.good{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);color:var(--ok)}
+.verdict.bad{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.45);color:var(--danger)}
+.verdict.mute{background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.small{font-size:11px;color:var(--muted);line-height:1.6}
+
+/* ===== 炫酷增强 ===== */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(600px 420px at 12% 8%,rgba(79,140,255,.20),transparent 60%),
+             radial-gradient(520px 400px at 88% 92%,rgba(124,92,255,.18),transparent 60%),
+             radial-gradient(420px 320px at 82% 12%,rgba(46,204,113,.10),transparent 60%);
+  animation:aurora 11s ease-in-out infinite alternate}
+@keyframes aurora{0%{transform:translate3d(0,0,0);opacity:.65}
+  50%{transform:translate3d(28px,-22px,0);opacity:1}
+  100%{transform:translate3d(-22px,16px,0);opacity:.7}}
+#app{position:relative;z-index:1}
+.panel,.side details{backdrop-filter:blur(14px);background:rgba(18,26,46,.72)}
+.panel{transition:border-color .25s,box-shadow .25s}
+.panel:hover{border-color:rgba(79,140,255,.35);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 0 1px rgba(79,140,255,.08)}
+button.act.primary{position:relative;overflow:hidden}
+button.act.primary::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 32%,rgba(255,255,255,.38) 50%,transparent 68%);
+  transform:translateX(-100%);animation:shine 3.2s ease-in-out infinite}
+@keyframes shine{0%,55%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.pill.ok .dot,.pill.busy .dot{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.9)}}
+.cmp .val{background:linear-gradient(135deg,#ffffff,#9fc2ff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;font-size:20px}
+.main::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 50%,transparent 55%,rgba(0,0,0,.42) 100%)}
+header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent}
+.logo{animation:logoGlow 3s ease-in-out infinite alternate}
+@keyframes logoGlow{from{box-shadow:0 0 10px rgba(79,140,255,.4)}to{box-shadow:0 0 20px rgba(124,92,255,.65)}}
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">校</div>
+    <div class="t">吊舱↔双目 对比验证<small>Gimbal ↔ Stereo Calibration Check</small></div>
+    <div class="sp"></div>
+    <span class="pill" id="pill"><span class="dot"></span><span id="stat">未取帧</span></span>
+  </header>
+
+  <div class="toolbar">
+    <button class="act primary" id="fetchFrame">📷 获取帧</button>
+    <button class="act" id="detect">⭕ 检测圆</button>
+    <button class="act ghost" id="undo">撤销</button>
+    <button class="act ghost" id="clear">清空</button>
+  </div>
+
+  <div class="body">
+    <div class="main" id="mainBox">
+      <canvas id="cv"></canvas>
+      <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，然后点 4 个孔（自动吸附，可拖动微调）</div>
+    </div>
+    <div class="side">
+  <div class="panel" style="margin-bottom:calc(13px + env(safe-area-inset-bottom))">
+    <h3>计算结果 · 中心为四孔对角线交点</h3>
+    <div class="cmp">
+      <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
+      <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <details>
+    <summary>单应 H · 提前标定</summary>
+    <div class="panel">
+      <textarea id="hIn"></textarea>
+    </div>
+  </details>
+
+  <details>
+    <summary>内参与工作参数</summary>
+    <div class="panel">
+      <div class="row">
+        <div class="field">Z (mm)<input id="pZ" value="731"></div>
+        <div class="field">fx<input id="pfx" value="1081.7555"></div>
+        <div class="field">fy<input id="pfy" value="1081.9276"></div>
+        <div class="field">基准x<input id="prx" value="787"></div>
+        <div class="field">基准y<input id="pry" value="535"></div>
+        <div class="field">阈值(mm)<input id="pThr" value="2" style="width:56px"></div>
+      </div>
+    </div>
+  </details>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= 吸附（holesnap 算法） ================= */
+const DEFAULTS={windowR:160,minArea:80,searchR:40};
+function clamp(v,lo,hi){return v<lo?lo:(v>hi?hi:v)}
+function otsu(hist,total){let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
+  let bg=0,mb=0,bestV=-1,bestT=127;
+  for(let i=0;i<256;i++){bg+=hist[i];if(bg===0)continue;const fg=total-bg;if(fg===0)break;
+    mb+=i*hist[i];const mbAvg=mb/bg,mfAvg=(sum-mb)/fg;const v=bg*fg*(mbAvg-mfAvg)*(mbAvg-mfAvg);
+    if(v>bestV){bestV=v;bestT=i}}return bestT}
+function snapImageData(id,u,v,opts){const o=Object.assign({},DEFAULTS,opts||{});
+  const W=id.width,H=id.height,data=id.data;
+  const x0=clamp(Math.floor(u-o.windowR),0,W-1),y0=clamp(Math.floor(v-o.windowR),0,H-1);
+  const x1=clamp(Math.ceil(u+o.windowR),0,W-1),y1=clamp(Math.ceil(v+o.windowR),0,H-1);
+  const w=x1-x0+1,h=y1-y0+1;if(w<=0||h<=0)return null;
+  const lum=new Uint8Array(w*h),hist=new Uint32Array(256);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const si=((y0+y)*W+(x0+x))*4;
+    const g=(data[si]*299+data[si+1]*587+data[si+2]*114)/1000|0;lum[y*w+x]=g;hist[g]++}
+  const t=otsu(hist,w*h);
+  let sx=clamp(Math.round(u-x0),0,w-1),sy=clamp(Math.round(v-y0),0,h-1);
+  if(lum[sy*w+sx]>t){let found=false;
+    for(let r=1;r<=o.searchR&&!found;r++)for(let dy=-r;dy<=r&&!found;dy++)for(let dx=-r;dx<=r;dx++){
+      const nx=sx+dx,ny=sy+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;
+      if(lum[ny*w+nx]<=t){sx=nx;sy=ny;found=true;break}}
+    if(!found)return null}
+  const seen=new Uint8Array(w*h),stack=[sy*w+sx];seen[sy*w+sx]=1;let n=0,sumx=0,sumy=0;
+  while(stack.length){const idx=stack.pop();if(lum[idx]>t)continue;
+    const cx=idx%w,cy=(idx/w)|0;n++;sumx+=cx;sumy+=cy;
+    if(cx>0&&!seen[idx-1]){seen[idx-1]=1;stack.push(idx-1)}
+    if(cx<w-1&&!seen[idx+1]){seen[idx+1]=1;stack.push(idx+1)}
+    if(cy>0&&!seen[idx-w]){seen[idx-w]=1;stack.push(idx-w)}
+    if(cy<h-1&&!seen[idx+w]){seen[idx+w]=1;stack.push(idx+w)}}
+  if(n<o.minArea)return null;
+  return{cx:x0+sumx/n,cy:y0+sumy/n,r:Math.sqrt(n/Math.PI),area:n}}
+
+/* ================= 数学 ================= */
+function applyH(H,x,y){const w=H[6]*x+H[7]*y+H[8];
+  return[(H[0]*x+H[1]*y+H[2])/w,(H[3]*x+H[4]*y+H[5])/w]}
+function parseH(t){const nums=t.replace(/[\[\]]/g,' ').split(/[\s,;]+/).filter(s=>s.length).map(Number);
+  return(nums.length===9&&!nums.some(isNaN))?nums:null}
+
+/* ============ 自动检测圆（迁移板端"外接矩形法"：Otsu + 连通域 + 圆度） ============ */
+function detectCircles(){
+  if(!off.width)return[];
+  const id=octx.getImageData(0,0,off.width,off.height);
+  const W=id.width,H=id.height,data=id.data,N=W*H;
+  const gray=new Uint8Array(N),hist=new Uint32Array(256);
+  for(let i=0;i<N;i++){const g=(data[i*4]*299+data[i*4+1]*587+data[i*4+2]*114)/1000|0;gray[i]=g;hist[g]++}
+  const t=otsu(hist,N);
+  let dark=0;for(let i=0;i<N;i++)if(gray[i]<t)dark++;
+  const invert=dark>N*0.5;                       // 暗背景→找亮孔（黑帽场景的近似）
+  const isHole=invert?(g)=>g>=t:(g)=>g<t;
+  const seen=new Uint8Array(N),comps=[];
+  for(let i=0;i<N;i++){
+    if(seen[i]||!isHole(gray[i]))continue;
+    const stack=[i];seen[i]=1;let area=0,sumx=0,sumy=0,minx=W,maxx=0,miny=H,maxy=0;
+    while(stack.length){const p=stack.pop();area++;
+      const x=p%W,y=(p/W)|0;sumx+=x;sumy+=y;
+      if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;
+      if(x>0&&!seen[p-1]&&isHole(gray[p-1])){seen[p-1]=1;stack.push(p-1)}
+      if(x<W-1&&!seen[p+1]&&isHole(gray[p+1])){seen[p+1]=1;stack.push(p+1)}
+      if(y>0&&!seen[p-W]&&isHole(gray[p-W])){seen[p-W]=1;stack.push(p-W)}
+      if(y<H-1&&!seen[p+W]&&isHole(gray[p+W])){seen[p+W]=1;stack.push(p+W)}}
+    const bw=maxx-minx+1,bh=maxy-miny+1;
+    if(Math.min(bw,bh)/Math.max(bw,bh)>0.5 && area/(bw*bh)>0.4 && area>60)
+      comps.push({cx:sumx/area,cy:sumy/area,r:(bw+bh)/4,area});
+  }
+  comps.sort((a,b)=>b.area-a.area);
+  return comps.slice(0,4);
+}
+function autoDetect(){
+  const c=detectCircles();
+  if(!c.length){document.getElementById('hint').textContent='未检测到圆，可手动点孔';return}
+  marks=c.map(m=>({cx:m.cx,cy:m.cy,r:m.r,snapped:true,auto:true}));
+  draw();recompute();
+  document.getElementById('hint').textContent='检测到 '+c.length+' 个圆，可拖动微调或手动补点';
+}
+
+/* ============ 预置常量（部署时替换） ============ */
+const H_FALLBACK = "0.960786 0.113722 221.225764 0.041811 1.750072 55.030138 0.000008 0.00017 1.0";
+const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
+let DEFAULT_H = H_FALLBACK, DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
+
+/* ================= 画布标注 ================= */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const box=document.getElementById('mainBox');
+const img=new Image(),off=document.createElement('canvas'),octx=off.getContext('2d');
+let marks=[],fitScale=1,dragging=-1,loupeOn=false,loupeX=0,loupeY=0,loupeU=0,loupeV=0;
+const ds=()=>fitScale,bx=()=>(cv.width-img.width*ds())/2,by=()=>(cv.height-img.height*ds())/2;
+const toImg=(x,y)=>({u:(x-bx())/ds(),v:(y-by())/ds()});
+function fit(){const mw=box.clientWidth,mh=box.clientHeight;
+  if(mw<=0||mh<=0){requestAnimationFrame(fit);return;}
+  cv.width=mw;cv.height=mh;fitScale=Math.min(mw/img.width,mh/img.height);draw()}
+function ring(x,y,r,c,lw){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.beginPath();ctx.arc(X,Y,r*d,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=lw;ctx.shadowColor=c;ctx.shadowBlur=7;ctx.stroke();ctx.restore()}
+function dot(x,y,c,s){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.fillStyle=c;ctx.beginPath();ctx.arc(X,Y,s,0,Math.PI*2);ctx.shadowColor=c;ctx.shadowBlur=9;ctx.fill();ctx.restore()}
+function drawLoupe(){if(!loupeOn)return;const R=64,Z=3;
+  const cx=Math.max(R+6,Math.min(cv.width-R-6,loupeX));
+  const cy=loupeY-95<R+6?loupeY+95:loupeY-95;const cw=2*R/Z;
+  ctx.save();ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
+  ctx.fillStyle='#000';ctx.fillRect(cx-R,cy-R,2*R,2*R);
+  ctx.drawImage(off,loupeU-cw/2,loupeV-cw/2,cw,cw,cx-R,cy-R,2*R,2*R);ctx.restore();
+  ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  ctx.strokeStyle='#ef4444';ctx.lineWidth=1.5;ctx.beginPath();
+  ctx.moveTo(cx-12,cy);ctx.lineTo(cx+12,cy);ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke()}
+function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
+  const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
+  marks.forEach((m,i)=>{ring(m.cx,m.cy,m.r,'#22c55e',2.5);dot(m.cx,m.cy,'#22c55e',4.5);
+    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8);
+    if(i===dragging)ring(m.cx,m.cy,m.r,'#fff',1.2)});
+  drawLoupe()}
+function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
+  if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
+img.onload=()=>{off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];fit();setStat('已标 0/4 孔','ok');recompute()};
+img.onerror=()=>{document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
+new ResizeObserver(fit).observe(box);
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
+  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
+  const hit=hitMarker(u,v);
+  if(hit>=0){dragging=hit}
+  else{const s=snapImageData(octx.getImageData(0,0,off.width,off.height),u,v);
+    const cx=s?s.cx:u, cy=s?s.cy:v;
+    const dup=marks.find(m=>Math.hypot(m.cx-cx,m.cy-cy)<60);
+    if(dup){dragging=marks.indexOf(dup)}
+    else{marks.push({cx,cy,r:s?s.r:30,snapped:!!s,auto:false});dragging=marks.length-1}}
+  loupeOn=true;loupeX=px;loupeY=py;const m=marks[dragging];loupeU=m.cx;loupeV=m.cy;draw();recompute()});
+let rafPending=false,lastRC=0;
+function scheduleDraw(){if(rafPending)return;rafPending=true;
+  requestAnimationFrame(()=>{rafPending=false;draw()})}
+function throttledRC(){const n=performance.now();if(n-lastRC>150){lastRC=n;recompute()}}
+cv.addEventListener('pointermove',e=>{if(!loupeOn&&dragging<0)return;
+  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
+  if(dragging>=0){marks[dragging].cx=u;marks[dragging].cy=v;marks[dragging].snapped=false;loupeU=u;loupeV=v}
+  loupeX=px;loupeY=py;scheduleDraw();if(dragging>=0)throttledRC()});
+function end(){dragging=-1;loupeOn=false;draw();recompute()}
+cv.addEventListener('pointerup',e=>{try{cv.releasePointerCapture(e.pointerId)}catch(_){}end()});
+cv.addEventListener('pointercancel',end);
+cv.addEventListener('touchmove',e=>{if(dragging>=0||loupeOn)e.preventDefault()},{passive:false});
+
+/* ================= 获取帧（直接拉 URL，不选文件） ================= */
+function fetchFrame(){
+  // App 内：原生 libVLC 抓 RTSP 帧
+  if(DEFAULT_RTSP && window.G20 && window.G20.grabFrame){
+    setStat('取帧中…','busy');
+    window.G20.grabFrame(DEFAULT_RTSP);   // 原生抓完回调 loadCompareFrame(dataUrl)
+    return;
+  }
+  // 回退：HTTP 抓帧（浏览器调试）
+  const u=DEFAULT_FRAME_URL;
+  if(!u){document.getElementById('hint').textContent='未配置帧源';return}
+  setStat('取帧中…','busy');
+  img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
+document.getElementById('fetchFrame').onclick=()=>fetchFrame();
+document.getElementById('detect').onclick=()=>autoDetect();
+document.getElementById('undo').onclick=()=>{marks.pop();draw();recompute()};
+document.getElementById('clear').onclick=()=>{marks=[];draw();recompute()};
+
+/* ================= 结果计算 ================= */
+const $=id=>document.getElementById(id);
+function getParam(id){return parseFloat($(id).value)}
+function getH(){return parseH($('hIn').value)}
+function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
+function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
+function recompute(){
+  const H=getH();
+  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';setVerdict('','');return}
+  setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
+  if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+    setVerdict('需点满 4 个孔（当前 '+marks.length+'）','mute');return}
+  const mp=marks.map(m=>applyH(H,m.cx,m.cy));
+  const cx=mp.reduce((s,p)=>s+p[0],0)/4,cy=mp.reduce((s,p)=>s+p[1],0)/4;
+  const Z=getParam('pZ'),fx=getParam('pfx'),fy=getParam('pfy'),rx=getParam('prx'),ry=getParam('pry');
+  const dx=(rx-cx)*Z/fx,dy=(ry-cy)*Z/fy;
+  $('vgdx').innerHTML=fmt(dx,2)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,2)+'<small>mm</small>';
+  setVerdict('','');
+}
+function setVerdict(txt,cls){const v=$('verdict');v.textContent=txt;
+  v.className='verdict'+(cls?' '+cls:'');v.style.display=txt?'flex':'none'}
+['pZ','pfx','pfy','prx','pry','pThr','hIn'].forEach(id=>$(id).addEventListener('input',recompute));
+
+/* ================= 持久化（H/真值） ================= */
+function loadSaved(){try{const s=localStorage.getItem('gimbal_cmp');
+  if(s){const o=JSON.parse(s);if(o.H)$('hIn').value=o.H}}catch(_){}}
+window.addEventListener('beforeunload',()=>{try{localStorage.setItem('gimbal_cmp',JSON.stringify(
+  {H:$('hIn').value}))}catch(_){}});
+
+/* ================= 安卓 WebView 桥 ================= */
+window.loadCompareFrame=function(url){
+  if(!url){document.getElementById('hint').textContent='抓帧失败，检查 RTSP';setStat('取帧失败','');return}
+  setStat('取帧中…','busy');
+  img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
+};
+window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
+window.setH=function(arr9){if(Array.isArray(arr9)&&arr9.length===9)$('hIn').value=arr9.join(' ');recompute()};
+
+/* ================= 初始化 ================= */
+function applyConfig(){
+  const CFG = (typeof window!=='undefined' && window.GIMBAL_CONFIG) || {};
+  DEFAULT_H = CFG.H || H_FALLBACK;
+  DEFAULT_FRAME_URL = CFG.frameUrl || URL_FALLBACK;
+  DEFAULT_RTSP = CFG.rtspUrl || '';
+  $('hIn').value = DEFAULT_H;
+  if(CFG.Z!=null)$('pZ').value=CFG.Z;
+  if(CFG.fx!=null)$('pfx').value=CFG.fx;
+  if(CFG.fy!=null)$('pfy').value=CFG.fy;
+  if(CFG.baseX!=null)$('prx').value=CFG.baseX;
+  if(CFG.baseY!=null)$('pry').value=CFG.baseY;
+  if(CFG.threshold!=null)$('pThr').value=CFG.threshold;
+  recompute();
+}
+/* 现场免重打包：HBuilder 运行时读 /sdcard/gimbal_config.json 覆盖内置配置 */
+function loadExternalConfig(){
+  if(typeof plus==='undefined'||!plus.io) return;
+  const paths=['/sdcard/gimbal_config.json','_doc/gimbal_config.json'];
+  let i=0;
+  (function tryNext(){
+    if(i>=paths.length) return;
+    const p=paths[i++];
+    plus.io.resolveLocalFileSystemURL(p, function(entry){
+      entry.file(function(file){
+        const r=new plus.io.FileReader();
+        r.onloadend=function(e){
+          try{
+            const ext=JSON.parse(e.target.result);
+            if(ext && typeof ext==='object'){
+              window.GIMBAL_CONFIG = Object.assign({}, window.GIMBAL_CONFIG||{}, ext);
+              applyConfig();
+            }
+          }catch(err){ /* 解析失败，沿用内置配置 */ }
+        };
+        r.readAsText(file, 'utf-8');
+      }, tryNext);
+    }, tryNext);
+  })();
+}
+applyConfig();
+loadSaved();recompute();
+loadExternalConfig();
+</script>
+</body>
+</html>
