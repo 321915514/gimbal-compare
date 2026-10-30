@@ -121,12 +121,19 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .spinner.show{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
-/* 拖动/放大按钮 */
-.tools{display:flex;gap:8px;margin-top:11px}
-.tgl{flex:1;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
-  color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s}
-.tgl.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;
-  box-shadow:0 3px 10px rgba(79,140,255,.3)}
+/* 十字方向键（小按钮） + 圆大小按钮 */
+.dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:5px;justify-content:center;margin-top:11px}
+.dpad .nav{height:44px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);font-size:16px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.dpad .nav:active{transform:scale(.88);background:var(--panel)}
+#mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
+.sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.sizepad .nav{height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.sizepad .nav:active{transform:scale(.94);background:var(--panel)}
 </style>
 <script src="config.js"></script>
 </head>
@@ -150,7 +157,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <div class="main" id="mainBox">
       <canvas id="cv"></canvas>
       <div class="spinner" id="spinner"></div>
-      <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，然后点 4 个孔（自动吸附，可拖动微调）</div>
+      <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，点孔标注（自动吸附），点圆选中后按钮微调</div>
     </div>
     <div class="side">
   <div class="panel" style="margin-bottom:calc(13px + env(safe-area-inset-bottom))">
@@ -159,9 +166,15 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
     </div>
-    <div class="tools">
-      <button class="tgl active" id="tglDrag">✋ 拖动</button>
-      <button class="tgl active" id="tglLoupe">🔍 放大</button>
+    <div class="dpad">
+      <button class="nav" id="mvUp">↑</button>
+      <button class="nav" id="mvLeft">←</button>
+      <button class="nav" id="mvRight">→</button>
+      <button class="nav" id="mvDown">↓</button>
+    </div>
+    <div class="sizepad">
+      <button class="nav" id="shrink">缩小圆</button>
+      <button class="nav" id="enlarge">放大圆</button>
     </div>
   </div>
 
@@ -242,9 +255,9 @@ function detectCircles(){
 function autoDetect(){
   const c=detectCircles();
   if(!c.length){document.getElementById('hint').textContent='未检测到圆，可手动点孔';return}
-  marks=c.map(m=>({cx:m.cx,cy:m.cy,r:m.r,snapped:true,auto:true}));
+  marks=c.map(m=>({cx:m.cx,cy:m.cy,r:m.r,snapped:true,auto:true}));selected=-1;
   draw();recompute();
-  document.getElementById('hint').textContent='检测到 '+c.length+' 个圆，可拖动微调或手动补点';
+  document.getElementById('hint').textContent='检测到 '+c.length+' 个圆，点圆选中后用按钮微调';
 }
 
 /* ============ 预置常量（部署时替换） ============ */
@@ -257,7 +270,7 @@ let Z = 731, FX = 1081.7555, FY = 1081.9276, BASE_X = 787, BASE_Y = 535, THR = 2
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const box=document.getElementById('mainBox');
 const img=new Image(),off=document.createElement('canvas'),octx=off.getContext('2d');
-let marks=[],fitScale=1,dragging=-1,loupeOn=false,loupeX=0,loupeY=0,loupeU=0,loupeV=0;
+let marks=[],fitScale=1,selected=-1;
 const ds=()=>fitScale,bx=()=>(cv.width-img.width*ds())/2,by=()=>(cv.height-img.height*ds())/2;
 const toImg=(x,y)=>({u:(x-bx())/ds(),v:(y-by())/ds()});
 function fit(){const mw=box.clientWidth,mh=box.clientHeight;
@@ -265,51 +278,44 @@ function fit(){const mw=box.clientWidth,mh=box.clientHeight;
   cv.width=mw;cv.height=mh;fitScale=Math.min(mw/img.width,mh/img.height);draw()}
 function ring(x,y,r,c,lw){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.beginPath();ctx.arc(X,Y,r*d,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=lw;ctx.shadowColor=c;ctx.shadowBlur=7;ctx.stroke();ctx.restore()}
 function dot(x,y,c,s){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.fillStyle=c;ctx.beginPath();ctx.arc(X,Y,s,0,Math.PI*2);ctx.shadowColor=c;ctx.shadowBlur=9;ctx.fill();ctx.restore()}
-function drawLoupe(){if(!loupeOn||!loupeMode)return;const R=64,Z=3;
-  const cx=Math.max(R+6,Math.min(cv.width-R-6,loupeX));
-  const cy=loupeY-95<R+6?loupeY+95:loupeY-95;const cw=2*R/Z;
-  ctx.save();ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
-  ctx.fillStyle='#000';ctx.fillRect(cx-R,cy-R,2*R,2*R);
-  ctx.drawImage(off,loupeU-cw/2,loupeV-cw/2,cw,cw,cx-R,cy-R,2*R,2*R);ctx.restore();
-  ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
-  ctx.strokeStyle='#ef4444';ctx.lineWidth=1.5;ctx.beginPath();
-  ctx.moveTo(cx-12,cy);ctx.lineTo(cx+12,cy);ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke()}
 function spinner(on){const el=document.getElementById('spinner');if(el)el.classList.toggle('show',!!on)}
 function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
   const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
-  marks.forEach((m,i)=>{ring(m.cx,m.cy,m.r,'#22c55e',2.5);dot(m.cx,m.cy,'#22c55e',4.5);
-    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8);
-    if(i===dragging)ring(m.cx,m.cy,m.r,'#fff',1.2)});
-  drawLoupe()}
+  marks.forEach((m,i)=>{const sel=i===selected;
+    ring(m.cx,m.cy,m.r,sel?'#ffffff':'#22c55e',sel?3:2.5);
+    dot(m.cx,m.cy,sel?'#ffffff':'#22c55e',sel?6:4.5);
+    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
+}
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
-img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];fit();setStat('已标 0/4 孔','ok');recompute()};
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;fit();setStat('已标 0/4 孔','ok');recompute()};
 img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
 new ResizeObserver(fit).observe(box);
-cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
+cv.addEventListener('pointerdown',e=>{
   const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
   const hit=hitMarker(u,v);
-  if(hit>=0){dragging=hit}
+  if(hit>=0){selected=hit}
   else{const s=snapImageData(octx.getImageData(0,0,off.width,off.height),u,v);
     const cx=s?s.cx:u, cy=s?s.cy:v;
     const dup=marks.find(m=>Math.hypot(m.cx-cx,m.cy-cy)<60);
-    if(dup){dragging=marks.indexOf(dup)}
-    else{marks.push({cx,cy,r:s?s.r:30,snapped:!!s,auto:false});dragging=marks.length-1}}
-  loupeOn=true;loupeX=px;loupeY=py;const m=marks[dragging];loupeU=m.cx;loupeV=m.cy;draw();recompute()});
-let rafPending=false;
-function scheduleDraw(){if(rafPending)return;rafPending=true;
-  requestAnimationFrame(()=>{rafPending=false;draw()})}
-cv.addEventListener('pointermove',e=>{if(!loupeOn&&dragging<0)return;
-  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
-  if(dragging>=0&&dragMode){marks[dragging].cx=u;marks[dragging].cy=v;marks[dragging].snapped=false;loupeU=u;loupeV=v}
-  loupeX=px;loupeY=py;scheduleDraw()});
-function end(){dragging=-1;loupeOn=false;draw();recompute()}
-cv.addEventListener('pointerup',e=>{try{cv.releasePointerCapture(e.pointerId)}catch(_){}end()});
-cv.addEventListener('pointercancel',end);
-cv.addEventListener('touchmove',e=>{if(dragging>=0||loupeOn)e.preventDefault()},{passive:false});
-let dragMode=true,loupeMode=true;
-document.getElementById('tglDrag').onclick=()=>{dragMode=!dragMode;document.getElementById('tglDrag').classList.toggle('active',dragMode)};
-document.getElementById('tglLoupe').onclick=()=>{loupeMode=!loupeMode;document.getElementById('tglLoupe').classList.toggle('active',loupeMode)};
+    if(dup){selected=marks.indexOf(dup)}
+    else{marks.push({cx,cy,r:s?s.r:30,snapped:!!s,auto:false});selected=marks.length-1}}
+  draw();recompute()});
+/* 选中圆后：方向键微调位置 + 放大/缩小圆 */
+function nudge(dx,dy){const m=marks[selected];if(!m)return;m.cx+=dx;m.cy+=dy;m.snapped=false;draw();recompute()}
+function resize(dr){const m=marks[selected];if(!m)return;m.r=Math.max(10,m.r+dr);draw()}
+function holdRepeat(btn,fn,interval=90){let timer=null,rep=null;
+  const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null};
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();fn();
+    timer=setTimeout(()=>{rep=setInterval(fn,interval)},220)});
+  btn.addEventListener('pointerup',stop);btn.addEventListener('pointerleave',stop);
+  btn.addEventListener('pointercancel',stop)}
+holdRepeat(document.getElementById('mvUp'),()=>nudge(0,-5));
+holdRepeat(document.getElementById('mvDown'),()=>nudge(0,5));
+holdRepeat(document.getElementById('mvLeft'),()=>nudge(-5,0));
+holdRepeat(document.getElementById('mvRight'),()=>nudge(5,0));
+holdRepeat(document.getElementById('shrink'),()=>resize(-4));
+holdRepeat(document.getElementById('enlarge'),()=>resize(4));
 
 /* ================= 获取帧（直接拉 URL，不选文件） ================= */
 function fetchFrame(){
@@ -326,8 +332,8 @@ function fetchFrame(){
   img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
 document.getElementById('detect').onclick=()=>autoDetect();
-document.getElementById('undo').onclick=()=>{marks.pop();draw();recompute()};
-document.getElementById('clear').onclick=()=>{marks=[];draw();recompute()};
+document.getElementById('undo').onclick=()=>{marks.pop();if(selected>=marks.length)selected=-1;draw();recompute()};
+document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recompute()};
 
 /* ================= 结果计算 ================= */
 const $=id=>document.getElementById(id);
