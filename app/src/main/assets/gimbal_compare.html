@@ -114,6 +114,13 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   -webkit-text-fill-color:transparent}
 .logo{animation:logoGlow 3s ease-in-out infinite alternate}
 @keyframes logoGlow{from{box-shadow:0 0 10px rgba(79,140,255,.4)}to{box-shadow:0 0 20px rgba(124,92,255,.65)}}
+/* 加载转圈 */
+.spinner{position:absolute;top:50%;left:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+  border:4px solid rgba(79,140,255,.18);border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;display:none;pointer-events:none;z-index:6}
+.spinner.show{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
 </style>
 <script src="config.js"></script>
 </head>
@@ -136,6 +143,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   <div class="body">
     <div class="main" id="mainBox">
       <canvas id="cv"></canvas>
+      <div class="spinner" id="spinner"></div>
       <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，然后点 4 个孔（自动吸附，可拖动微调）</div>
     </div>
     <div class="side">
@@ -148,26 +156,6 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <div class="verdict" id="verdict"></div>
   </div>
 
-  <details>
-    <summary>单应 H · 提前标定</summary>
-    <div class="panel">
-      <textarea id="hIn"></textarea>
-    </div>
-  </details>
-
-  <details>
-    <summary>内参与工作参数</summary>
-    <div class="panel">
-      <div class="row">
-        <div class="field">Z (mm)<input id="pZ" value="731"></div>
-        <div class="field">fx<input id="pfx" value="1081.7555"></div>
-        <div class="field">fy<input id="pfy" value="1081.9276"></div>
-        <div class="field">基准x<input id="prx" value="787"></div>
-        <div class="field">基准y<input id="pry" value="535"></div>
-        <div class="field">阈值(mm)<input id="pThr" value="2" style="width:56px"></div>
-      </div>
-    </div>
-  </details>
     </div>
   </div>
 </div>
@@ -253,7 +241,8 @@ function autoDetect(){
 /* ============ 预置常量（部署时替换） ============ */
 const H_FALLBACK = "0.960786 0.113722 221.225764 0.041811 1.750072 55.030138 0.000008 0.00017 1.0";
 const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
-let DEFAULT_H = H_FALLBACK, DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
+let H_STR = H_FALLBACK, DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
+let Z = 731, FX = 1081.7555, FY = 1081.9276, BASE_X = 787, BASE_Y = 535, THR = 2;
 
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -276,6 +265,7 @@ function drawLoupe(){if(!loupeOn)return;const R=64,Z=3;
   ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
   ctx.strokeStyle='#ef4444';ctx.lineWidth=1.5;ctx.beginPath();
   ctx.moveTo(cx-12,cy);ctx.lineTo(cx+12,cy);ctx.moveTo(cx,cy-12);ctx.lineTo(cx,cy+12);ctx.stroke()}
+function spinner(on){const el=document.getElementById('spinner');if(el)el.classList.toggle('show',!!on)}
 function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
   const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
   marks.forEach((m,i)=>{ring(m.cx,m.cy,m.r,'#22c55e',2.5);dot(m.cx,m.cy,'#22c55e',4.5);
@@ -284,8 +274,8 @@ function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.he
   drawLoupe()}
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
-img.onload=()=>{off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];fit();setStat('已标 0/4 孔','ok');recompute()};
-img.onerror=()=>{document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];fit();setStat('已标 0/4 孔','ok');recompute()};
+img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
 new ResizeObserver(fit).observe(box);
 cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
   const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
@@ -314,14 +304,14 @@ cv.addEventListener('touchmove',e=>{if(dragging>=0||loupeOn)e.preventDefault()},
 function fetchFrame(){
   // App 内：原生 libVLC 抓 RTSP 帧
   if(DEFAULT_RTSP && window.G20 && window.G20.grabFrame){
-    setStat('取帧中…','busy');
+    spinner(true);setStat('取帧中…','busy');
     window.G20.grabFrame(DEFAULT_RTSP);   // 原生抓完回调 loadCompareFrame(dataUrl)
     return;
   }
   // 回退：HTTP 抓帧（浏览器调试）
   const u=DEFAULT_FRAME_URL;
   if(!u){document.getElementById('hint').textContent='未配置帧源';return}
-  setStat('取帧中…','busy');
+  spinner(true);setStat('取帧中…','busy');
   img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
 document.getElementById('detect').onclick=()=>autoDetect();
@@ -330,8 +320,7 @@ document.getElementById('clear').onclick=()=>{marks=[];draw();recompute()};
 
 /* ================= 结果计算 ================= */
 const $=id=>document.getElementById(id);
-function getParam(id){return parseFloat($(id).value)}
-function getH(){return parseH($('hIn').value)}
+function getH(){return parseH(H_STR)}
 function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
@@ -342,43 +331,40 @@ function recompute(){
     setVerdict('需点满 4 个孔（当前 '+marks.length+'）','mute');return}
   const mp=marks.map(m=>applyH(H,m.cx,m.cy));
   const cx=mp.reduce((s,p)=>s+p[0],0)/4,cy=mp.reduce((s,p)=>s+p[1],0)/4;
-  const Z=getParam('pZ'),fx=getParam('pfx'),fy=getParam('pfy'),rx=getParam('prx'),ry=getParam('pry');
-  const dx=(rx-cx)*Z/fx,dy=(ry-cy)*Z/fy;
+  const dx=(BASE_X-cx)*Z/FX,dy=(BASE_Y-cy)*Z/FY;
   $('vgdx').innerHTML=fmt(dx,2)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,2)+'<small>mm</small>';
   setVerdict('','');
 }
 function setVerdict(txt,cls){const v=$('verdict');v.textContent=txt;
   v.className='verdict'+(cls?' '+cls:'');v.style.display=txt?'flex':'none'}
-['pZ','pfx','pfy','prx','pry','pThr','hIn'].forEach(id=>$(id).addEventListener('input',recompute));
 
 /* ================= 持久化（H/真值） ================= */
 function loadSaved(){try{const s=localStorage.getItem('gimbal_cmp');
-  if(s){const o=JSON.parse(s);if(o.H)$('hIn').value=o.H}}catch(_){}}
+  if(s){const o=JSON.parse(s);if(o.H)H_STR=o.H}}catch(_){}}
 window.addEventListener('beforeunload',()=>{try{localStorage.setItem('gimbal_cmp',JSON.stringify(
-  {H:$('hIn').value}))}catch(_){}});
+  {H:H_STR}))}catch(_){}});
 
 /* ================= 安卓 WebView 桥 ================= */
 window.loadCompareFrame=function(url){
-  if(!url){document.getElementById('hint').textContent='抓帧失败，检查 RTSP';setStat('取帧失败','');return}
-  setStat('取帧中…','busy');
+  if(!url){spinner(false);document.getElementById('hint').textContent='抓帧失败，检查 RTSP';setStat('取帧失败','');return}
+  spinner(true);setStat('取帧中…','busy');
   img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
 };
 window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
-window.setH=function(arr9){if(Array.isArray(arr9)&&arr9.length===9)$('hIn').value=arr9.join(' ');recompute()};
+window.setH=function(arr9){if(Array.isArray(arr9)&&arr9.length===9)H_STR=arr9.join(' ');recompute()};
 
 /* ================= 初始化 ================= */
 function applyConfig(){
   const CFG = (typeof window!=='undefined' && window.GIMBAL_CONFIG) || {};
-  DEFAULT_H = CFG.H || H_FALLBACK;
+  H_STR = CFG.H || H_FALLBACK;
   DEFAULT_FRAME_URL = CFG.frameUrl || URL_FALLBACK;
   DEFAULT_RTSP = CFG.rtspUrl || '';
-  $('hIn').value = DEFAULT_H;
-  if(CFG.Z!=null)$('pZ').value=CFG.Z;
-  if(CFG.fx!=null)$('pfx').value=CFG.fx;
-  if(CFG.fy!=null)$('pfy').value=CFG.fy;
-  if(CFG.baseX!=null)$('prx').value=CFG.baseX;
-  if(CFG.baseY!=null)$('pry').value=CFG.baseY;
-  if(CFG.threshold!=null)$('pThr').value=CFG.threshold;
+  if(CFG.Z!=null)Z=CFG.Z;
+  if(CFG.fx!=null)FX=CFG.fx;
+  if(CFG.fy!=null)FY=CFG.fy;
+  if(CFG.baseX!=null)BASE_X=CFG.baseX;
+  if(CFG.baseY!=null)BASE_Y=CFG.baseY;
+  if(CFG.threshold!=null)THR=CFG.threshold;
   recompute();
 }
 /* 现场免重打包：HBuilder 运行时读 /sdcard/gimbal_config.json 覆盖内置配置 */
