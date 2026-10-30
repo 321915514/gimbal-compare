@@ -223,6 +223,22 @@ function applyH(H,x,y){const w=H[6]*x+H[7]*y+H[8];
 function parseH(t){const nums=t.replace(/[\[\]]/g,' ').split(/[\s,;]+/).filter(s=>s.length).map(Number);
   return(nums.length===9&&!nums.some(isNaN))?nums:null}
 
+/* ============ RANSAC 鲁棒质心：挑最像矩形的 4 个点，剔除误点的圆 ============ */
+function parallelogramResidual(p){const cx=(p[0].x+p[1].x+p[2].x+p[3].x)/4,cy=(p[0].y+p[1].y+p[2].y+p[3].y)/4;
+  const q=p.slice().sort((a,b)=>Math.atan2(a.y-cy,a.x-cx)-Math.atan2(b.y-cy,b.x-cx));
+  return Math.hypot((q[0].x+q[2].x-q[1].x-q[3].x)/2,(q[0].y+q[2].y-q[1].y-q[3].y)/2)}
+function enumerate4(n){const out=[];
+  if(n<=12){for(let a=0;a<n-3;a++)for(let b=a+1;b<n-2;b++)for(let c=b+1;c<n-1;c++)for(let d=c+1;d<n;d++)out.push([a,b,c,d])}
+  else{const seen=new Set();for(let t=0;t<2000;t++){const i=[];while(i.length<4){const r=Math.floor(Math.random()*n);if(!i.includes(r))i.push(r)}i.sort((a,b)=>a-b);const k=i.join(',');if(!seen.has(k)){seen.add(k);out.push(i)}}}
+  return out}
+function robustCentroid(pts){const n=pts.length;if(n<4)return null;
+  if(n===4){const cx=pts.reduce((s,p)=>s+p.x,0)/4,cy=pts.reduce((s,p)=>s+p.y,0)/4;return{cx,cy,inliers:[0,1,2,3]}}
+  let best=Infinity,bi=null;
+  for(const idx of enumerate4(n)){const res=parallelogramResidual(idx.map(i=>pts[i]));if(res<best){best=res;bi=idx}}
+  if(!bi)return null;
+  const cx=bi.reduce((s,i)=>s+pts[i].x,0)/4,cy=bi.reduce((s,i)=>s+pts[i].y,0)/4;
+  return{cx,cy,inliers:bi}}
+
 /* ============ 自动检测圆（迁移板端"外接矩形法"：Otsu + 连通域 + 圆度） ============ */
 function detectCircles(){
   if(!off.width)return[];
@@ -270,7 +286,7 @@ let Z = 731, FX = 1081.7555, FY = 1081.9276, BASE_X = 787, BASE_Y = 535, THR = 2
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const box=document.getElementById('mainBox');
 const img=new Image(),off=document.createElement('canvas'),octx=off.getContext('2d');
-let marks=[],fitScale=1,selected=-1;
+let marks=[],fitScale=1,selected=-1,inlierIdx=[];
 const ds=()=>fitScale,bx=()=>(cv.width-img.width*ds())/2,by=()=>(cv.height-img.height*ds())/2;
 const toImg=(x,y)=>({u:(x-bx())/ds(),v:(y-by())/ds()});
 function fit(){const mw=box.clientWidth,mh=box.clientHeight;
@@ -282,13 +298,15 @@ function spinner(on){const el=document.getElementById('spinner');if(el)el.classL
 function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
   const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
   marks.forEach((m,i)=>{const sel=i===selected;
-    ring(m.cx,m.cy,m.r,sel?'#ffc400':'#22c55e',sel?3.5:2.5);
-    dot(m.cx,m.cy,sel?'#ffc400':'#22c55e',sel?7:4.5);
+    const inl=inlierIdx.includes(i);
+    const col=sel?'#ffc400':(inl?'#22c55e':'#ff5d5d');
+    ring(m.cx,m.cy,m.r,col,sel?3.5:(inl?2.5:1.6));
+    dot(m.cx,m.cy,col,sel?7:(inl?4.5:3));
     ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
 }
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
-img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;fit();setStat('已标 0/4 孔','ok');recompute()};
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');recompute()};
 img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
 new ResizeObserver(fit).observe(box);
 cv.addEventListener('pointerdown',e=>{
@@ -342,15 +360,17 @@ function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
   const H=getH();
-  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';setVerdict('','');return}
+  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';inlierIdx=[];draw();return}
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
-    setVerdict('需点满 4 个孔（当前 '+marks.length+'）','mute');return}
-  const mp=marks.map(m=>applyH(H,m.cx,m.cy));
-  const cx=mp.reduce((s,p)=>s+p[0],0)/4,cy=mp.reduce((s,p)=>s+p[1],0)/4;
-  const dx=(BASE_X-cx)*Z/FX,dy=(BASE_Y-cy)*Z/FY;
+    inlierIdx=[];draw();return}
+  const mp=marks.map(m=>{const q=applyH(H,m.cx,m.cy);return{x:q[0],y:q[1]}});
+  const r=robustCentroid(mp);
+  if(!r){inlierIdx=[];draw();return}
+  inlierIdx=r.inliers;
+  const dx=(BASE_X-r.cx)*Z/FX,dy=(BASE_Y-r.cy)*Z/FY;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
-  setVerdict('','');
+  draw();
 }
 function setVerdict(txt,cls){}  // 结果区固定显示，动态提示已移除
 
