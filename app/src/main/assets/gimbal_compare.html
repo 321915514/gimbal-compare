@@ -69,7 +69,7 @@ textarea{width:100%;height:48px;border-radius:10px;border:1px solid var(--border
   color:var(--fg);padding:9px 11px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical}
 textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
-.cmp .cell{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:8px;text-align:center;
+.cmp .cell{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:8px 12px;text-align:left;
   transition:.15s}
 .cmp .cell.real{border-color:rgba(92,179,255,.4);background:rgba(92,179,255,.06)}
 .cmp .cell.delta-ok{border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.08)}
@@ -159,7 +159,6 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
     </div>
-    <div class="verdict" id="verdict"></div>
     <div class="tools">
       <button class="tgl active" id="tglDrag">✋ 拖动</button>
       <button class="tgl active" id="tglLoupe">🔍 放大</button>
@@ -347,8 +346,7 @@ function recompute(){
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   setVerdict('','');
 }
-function setVerdict(txt,cls){const v=$('verdict');v.textContent=txt;
-  v.className='verdict'+(cls?' '+cls:'');v.style.display=txt?'flex':'none'}
+function setVerdict(txt,cls){}  // 结果区固定显示，动态提示已移除
 
 /* ================= 持久化（H/真值） ================= */
 function loadSaved(){try{const s=localStorage.getItem('gimbal_cmp');
