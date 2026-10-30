@@ -13,6 +13,11 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+
+        // 只打包 arm64（G20 是 arm64），把 libvlc-all 里其他架构裁掉，APK 180MB -> ~50MB
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -32,5 +37,5 @@ android {
 }
 
 dependencies {
-    implementation 'org.videolan.android:libvlc-armv8:3.6.0'
+    implementation 'org.videolan.android:libvlc-all:3.6.0'
 }
