@@ -4,7 +4,7 @@
 window.GIMBAL_CONFIG = {
 
   // RTSP 地址：吊舱视频流（App 内原生抓帧用，现场只改这个）
-  rtspUrl: "rtsp://192.168.1.100:8554/stream",
+  rtspUrl: "rtsp://192.168.1.102:8554/test",
 
   // HTTP 抓帧地址（浏览器调试回退用，App 里不用）
   frameUrl: "http://127.0.0.1:8899/frame.jpg",
