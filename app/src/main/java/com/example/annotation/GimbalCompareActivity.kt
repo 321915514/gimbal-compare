@@ -71,7 +71,7 @@ class GimbalCompareActivity : Activity() {
         releasePlayer()
         try {
             val lv = LibVLC(this, arrayListOf(
-                "--network-caching=1000", "--live-caching=500",
+                "--network-caching=300", "--live-caching=200",
                 "--drop-late-frames", "--skip-frames"))
             libVLC = lv
             val mp = MediaPlayer(lv)
@@ -85,7 +85,7 @@ class GimbalCompareActivity : Activity() {
             mp.setEventListener { event ->
                 when (event.type) {
                     MediaPlayer.Event.Playing ->
-                        rtspView.postDelayed({ grabAndPush(); releasePlayer() }, 700)
+                        rtspView.postDelayed({ tryGrab(0) }, 800)
                     MediaPlayer.Event.EncounteredError -> { pushFail(); releasePlayer() }
                 }
             }
@@ -95,9 +95,38 @@ class GimbalCompareActivity : Activity() {
         }
     }
 
-    private fun grabAndPush() {
+    // 轮询抓帧直到非黑（RTSP 首帧要时间，黑帧=还没渲染出来）
+    private fun tryGrab(attempt: Int) {
+        if (attempt >= 12) { pushFail(); releasePlayer(); return }  // 约 6 秒超时
+        val bmp = try { rtspView.bitmap } catch (e: Exception) { null }
+        if (bmp != null && !isBlack(bmp)) {
+            pushJpeg(bmp); releasePlayer()
+        } else {
+            rtspView.postDelayed({ tryGrab(attempt + 1) }, 500)
+        }
+    }
+
+    private fun isBlack(bmp: Bitmap): Boolean {
+        var nonBlack = 0
+        val stepX = maxOf(1, bmp.width / 40)
+        val stepY = maxOf(1, bmp.height / 40)
+        var y = 0
+        while (y < bmp.height) {
+            var x = 0
+            while (x < bmp.width) {
+                val p = bmp.getPixel(x, y)
+                if ((p and 0xFF) > 20 || ((p shr 8) and 0xFF) > 20 || ((p shr 16) and 0xFF) > 20) {
+                    if (++nonBlack >= 8) return false
+                }
+                x += stepX
+            }
+            y += stepY
+        }
+        return true
+    }
+
+    private fun pushJpeg(bmp: Bitmap) {
         try {
-            val bmp = rtspView.bitmap ?: run { pushFail(); return }
             val bos = ByteArrayOutputStream()
             bmp.compress(Bitmap.CompressFormat.JPEG, 88, bos)
             val b64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
