@@ -107,7 +107,7 @@ button.act.primary::after{content:'';position:absolute;inset:0;
 .pill.ok .dot,.pill.busy .dot{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.9)}}
 .cmp .val{background:linear-gradient(135deg,#ffffff,#9fc2ff);-webkit-background-clip:text;background-clip:text;
-  -webkit-text-fill-color:transparent;font-size:20px}
+  -webkit-text-fill-color:transparent;font-size:20px;font-variant-numeric:tabular-nums}
 .main::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(120% 90% at 50% 50%,transparent 55%,rgba(0,0,0,.42) 100%)}
 header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background-clip:text;background-clip:text;
@@ -121,6 +121,12 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .spinner.show{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
+/* 拖动/放大按钮 */
+.tools{display:flex;gap:8px;margin-top:11px}
+.tgl{flex:1;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;transition:.14s}
+.tgl.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;
+  box-shadow:0 3px 10px rgba(79,140,255,.3)}
 </style>
 <script src="config.js"></script>
 </head>
@@ -154,6 +160,10 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
     </div>
     <div class="verdict" id="verdict"></div>
+    <div class="tools">
+      <button class="tgl active" id="tglDrag">✋ 拖动</button>
+      <button class="tgl active" id="tglLoupe">🔍 放大</button>
+    </div>
   </div>
 
     </div>
@@ -256,7 +266,7 @@ function fit(){const mw=box.clientWidth,mh=box.clientHeight;
   cv.width=mw;cv.height=mh;fitScale=Math.min(mw/img.width,mh/img.height);draw()}
 function ring(x,y,r,c,lw){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.beginPath();ctx.arc(X,Y,r*d,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=lw;ctx.shadowColor=c;ctx.shadowBlur=7;ctx.stroke();ctx.restore()}
 function dot(x,y,c,s){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.fillStyle=c;ctx.beginPath();ctx.arc(X,Y,s,0,Math.PI*2);ctx.shadowColor=c;ctx.shadowBlur=9;ctx.fill();ctx.restore()}
-function drawLoupe(){if(!loupeOn)return;const R=64,Z=3;
+function drawLoupe(){if(!loupeOn||!loupeMode)return;const R=64,Z=3;
   const cx=Math.max(R+6,Math.min(cv.width-R-6,loupeX));
   const cy=loupeY-95<R+6?loupeY+95:loupeY-95;const cw=2*R/Z;
   ctx.save();ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.clip();
@@ -287,18 +297,20 @@ cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);
     if(dup){dragging=marks.indexOf(dup)}
     else{marks.push({cx,cy,r:s?s.r:30,snapped:!!s,auto:false});dragging=marks.length-1}}
   loupeOn=true;loupeX=px;loupeY=py;const m=marks[dragging];loupeU=m.cx;loupeV=m.cy;draw();recompute()});
-let rafPending=false,lastRC=0;
+let rafPending=false;
 function scheduleDraw(){if(rafPending)return;rafPending=true;
   requestAnimationFrame(()=>{rafPending=false;draw()})}
-function throttledRC(){const n=performance.now();if(n-lastRC>150){lastRC=n;recompute()}}
 cv.addEventListener('pointermove',e=>{if(!loupeOn&&dragging<0)return;
   const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
-  if(dragging>=0){marks[dragging].cx=u;marks[dragging].cy=v;marks[dragging].snapped=false;loupeU=u;loupeV=v}
-  loupeX=px;loupeY=py;scheduleDraw();if(dragging>=0)throttledRC()});
+  if(dragging>=0&&dragMode){marks[dragging].cx=u;marks[dragging].cy=v;marks[dragging].snapped=false;loupeU=u;loupeV=v}
+  loupeX=px;loupeY=py;scheduleDraw()});
 function end(){dragging=-1;loupeOn=false;draw();recompute()}
 cv.addEventListener('pointerup',e=>{try{cv.releasePointerCapture(e.pointerId)}catch(_){}end()});
 cv.addEventListener('pointercancel',end);
 cv.addEventListener('touchmove',e=>{if(dragging>=0||loupeOn)e.preventDefault()},{passive:false});
+let dragMode=true,loupeMode=true;
+document.getElementById('tglDrag').onclick=()=>{dragMode=!dragMode;document.getElementById('tglDrag').classList.toggle('active',dragMode)};
+document.getElementById('tglLoupe').onclick=()=>{loupeMode=!loupeMode;document.getElementById('tglLoupe').classList.toggle('active',loupeMode)};
 
 /* ================= 获取帧（直接拉 URL，不选文件） ================= */
 function fetchFrame(){
@@ -332,7 +344,7 @@ function recompute(){
   const mp=marks.map(m=>applyH(H,m.cx,m.cy));
   const cx=mp.reduce((s,p)=>s+p[0],0)/4,cy=mp.reduce((s,p)=>s+p[1],0)/4;
   const dx=(BASE_X-cx)*Z/FX,dy=(BASE_Y-cy)*Z/FY;
-  $('vgdx').innerHTML=fmt(dx,2)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,2)+'<small>mm</small>';
+  $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   setVerdict('','');
 }
 function setVerdict(txt,cls){const v=$('verdict');v.textContent=txt;
