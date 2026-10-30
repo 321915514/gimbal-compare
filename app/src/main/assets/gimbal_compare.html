@@ -135,7 +135,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .sizepad .nav:active{transform:scale(.94);background:var(--panel)}
 /* 颜色图例 */
-.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--muted);margin:-1px 0 0}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--muted);margin-left:auto;white-space:nowrap}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .legend .lg i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
 </style>
@@ -155,6 +155,11 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <button class="act" id="detect">⭕ 检测圆</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
+    <div class="legend">
+      <span class="lg"><i style="background:#22c55e"></i>计算用</span>
+      <span class="lg"><i style="background:#ff5d5d"></i>已剔除</span>
+      <span class="lg"><i style="background:#ffc400"></i>选中</span>
+    </div>
   </div>
 
   <div class="body">
@@ -169,11 +174,6 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <div class="cmp">
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
-    </div>
-    <div class="legend">
-      <span class="lg"><i style="background:#22c55e"></i>计算用</span>
-      <span class="lg"><i style="background:#ff5d5d"></i>已剔除</span>
-      <span class="lg"><i style="background:#ffc400"></i>选中</span>
     </div>
     <div class="dpad">
       <button class="nav" id="mvUp">↑</button>
