@@ -40,8 +40,8 @@ button.act.primary:hover{filter:brightness(1.1)}
 .body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden}
 .main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none}
 .main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
-.side{width:235px;min-width:0;overflow-y:auto;padding:11px;display:flex;flex-direction:column;gap:11px;
-  background:var(--bg2)}
+.side{width:235px;min-width:0;overflow:hidden;padding:11px;display:flex;flex-direction:column;gap:11px;
+  background:var(--bg2);touch-action:none}
 .side .panel{margin:0}
 .side details{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
 .side details summary{padding:10px 13px;cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600;
@@ -49,7 +49,7 @@ button.act.primary:hover{filter:brightness(1.1)}
 .side details summary::-webkit-details-marker{display:none}
 .side details[open] summary{color:var(--fg);border-bottom:1px solid var(--border)}
 .side details .panel{margin:0;border:0;border-radius:0;background:transparent;padding:11px 13px}
-@media(orientation:portrait),(max-width:560px){.body{flex-direction:column}.side{width:auto;flex:none;overflow-y:visible}}
+@media(orientation:portrait),(max-width:560px){.body{flex-direction:column}.side{width:auto;flex:none;overflow:hidden;touch-action:none}}
 .hintbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;color:var(--muted);
   background:rgba(5,7,15,.82);padding:6px 15px;border-radius:20px;pointer-events:none;white-space:nowrap;
   border:1px solid var(--border)}
