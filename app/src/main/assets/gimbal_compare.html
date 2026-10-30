@@ -282,8 +282,8 @@ function spinner(on){const el=document.getElementById('spinner');if(el)el.classL
 function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
   const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
   marks.forEach((m,i)=>{const sel=i===selected;
-    ring(m.cx,m.cy,m.r,sel?'#ffffff':'#22c55e',sel?3:2.5);
-    dot(m.cx,m.cy,sel?'#ffffff':'#22c55e',sel?6:4.5);
+    ring(m.cx,m.cy,m.r,sel?'#ffc400':'#22c55e',sel?3.5:2.5);
+    dot(m.cx,m.cy,sel?'#ffc400':'#22c55e',sel?7:4.5);
     ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
 }
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
