@@ -153,6 +153,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   <div class="toolbar">
     <button class="act primary" id="fetchFrame">📷 获取帧</button>
     <button class="act" id="detect">⭕ 检测圆</button>
+    <button class="act" id="send">📤 发送</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
     <div class="legend">
@@ -295,7 +296,7 @@ let Z = 731, FX = 1081.7555, FY = 1081.9276, BASE_X = 787, BASE_Y = 535, THR = 2
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const box=document.getElementById('mainBox');
 const img=new Image(),off=document.createElement('canvas'),octx=off.getContext('2d');
-let marks=[],fitScale=1,selected=-1,inlierIdx=[];
+let marks=[],fitScale=1,selected=-1,inlierIdx=[],lastDx=null,lastDy=null;
 const ds=()=>fitScale,bx=()=>(cv.width-img.width*ds())/2,by=()=>(cv.height-img.height*ds())/2;
 const toImg=(x,y)=>({u:(x-bx())/ds(),v:(y-by())/ds()});
 function fit(){const mw=box.clientWidth,mh=box.clientHeight;
@@ -359,6 +360,7 @@ function fetchFrame(){
   img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
 document.getElementById('detect').onclick=()=>autoDetect();
+document.getElementById('send').onclick=()=>sendResult();
 document.getElementById('undo').onclick=()=>{marks.pop();if(selected>=marks.length)selected=-1;draw();recompute()};
 document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recompute()};
 
@@ -369,21 +371,17 @@ function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
   const H=getH();
-  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';inlierIdx=[];draw();return}
+  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';inlierIdx=[];lastDx=lastDy=null;draw();return}
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
-    inlierIdx=[];draw();return}
+    inlierIdx=[];lastDx=lastDy=null;draw();return}
   const mp=marks.map(m=>{const q=applyH(H,m.cx,m.cy);return{x:q[0],y:q[1]}});
   const r=robustCentroid(mp);
-  if(!r){inlierIdx=[];draw();return}
+  if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
   inlierIdx=r.inliers;
   const dx=(BASE_X-r.cx)*Z/FX,dy=(BASE_Y-r.cy)*Z/FY;
+  lastDx=dx; lastDy=dy;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
-  // 自动发布计算结果到 MQTT（若启用）
-  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-  if(mcfg && mcfg.enabled && mcfg.publish){
-    try{ mqttPublish(mcfg.publish, JSON.stringify({dx:+dx.toFixed(2), dy:+dy.toFixed(2)})); }catch(e){}
-  }
   draw();
 }
 function setVerdict(txt,cls){}  // 结果区固定显示，动态提示已移除
@@ -430,6 +428,20 @@ window.onMqttMessage = function(topic, payload){
 window.mqttPublish = function(topic, payload){
   if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
 };
+/* 手动调准后点「发送」，不自动发 */
+function sendResult(){
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(!mcfg || !mcfg.enabled || !mcfg.publish){
+    document.getElementById('hint').textContent='MQTT 未启用';
+    return;
+  }
+  if(lastDx==null || lastDy==null){
+    document.getElementById('hint').textContent='未标满 4 个孔，无法发送';
+    return;
+  }
+  mqttPublish(mcfg.publish, JSON.stringify({dx:+lastDx.toFixed(2), dy:+lastDy.toFixed(2)}));
+  document.getElementById('hint').textContent='已发送: dx='+lastDx.toFixed(2)+'  dy='+lastDy.toFixed(2);
+}
 
 /* ================= 初始化 ================= */
 function applyConfig(){
