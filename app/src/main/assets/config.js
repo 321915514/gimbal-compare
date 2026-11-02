@@ -4,7 +4,7 @@
 window.GIMBAL_CONFIG = {
 
   // RTSP 地址：吊舱视频流（App 内原生抓帧用，现场只改这个）
-  rtspUrl: "rtsp://192.168.1.103:8554/test",
+  rtspUrl: "rtsp://192.168.1.100:8554/test",
 
   // HTTP 抓帧地址（浏览器调试回退用，App 里不用）
   frameUrl: "http://127.0.0.1:8899/frame.jpg",
@@ -24,7 +24,7 @@ window.GIMBAL_CONFIG = {
   // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效；enabled=false 不连接）
   mqtt: {
     enabled: true,
-    broker: "tcp://192.168.1.103:1883",   // 板端 EMQX broker
+    broker: "tcp://192.168.1.100:1883",   // 板端 EMQX broker
     clientId: "g20",
     subscribe: "gimbal/real_dxdy",         // 订阅双目/云台真值
     publish: "gimbal/result"               // 发布本机计算结果
