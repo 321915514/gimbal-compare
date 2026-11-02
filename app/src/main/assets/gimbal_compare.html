@@ -395,17 +395,20 @@ function startMqttFromConfig(){
   const m = (window.GIMBAL_CONFIG||{}).mqtt;
   if(!m || !m.enabled) return;
   if(window.G20 && window.G20.mqttStart){
-    const topics = [m.subscribe, m.calibCmd].filter(Boolean).join(',');
+    const topics = [m.subscribe, m.calibStatus].filter(Boolean).join(',');
     window.G20.mqttStart(m.broker||'', m.clientId||'g20', topics);
   }
 }
 window.onMqttMessage = function(topic, payload){
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-  // 校准命令（aruco/stop）
-  if(mcfg && mcfg.calibCmd && topic === mcfg.calibCmd){
+  // 校准状态（aruco/calibrate/status，订阅收）
+  if(mcfg && mcfg.calibStatus && topic === mcfg.calibStatus){
     try{
       const o = JSON.parse(payload);
-      if(o.cmd === 'calibrate') calibrate();
+      const names = ['未纠偏','纠偏中','纠偏完成'];
+      if(o.status!=null){
+        document.getElementById('hint').textContent = '校准状态: ' + (names[o.status] || ('状态'+o.status));
+      }
     }catch(e){}
     return;
   }
@@ -429,11 +432,7 @@ window.onMqttMessage = function(topic, payload){
 window.mqttPublish = function(topic, payload){
   if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
 };
-/* 校准：记下当前四孔中心为参考点（按钮点、或 MQTT aruco/stop 收 cmd=calibrate 触发） */
-function publishCalibStatus(status){
-  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-  if(mcfg && mcfg.calibStatus) mqttPublish(mcfg.calibStatus, JSON.stringify({status:status}));
-}
+/* 校准：记下当前四孔中心为参考点 + 发布 cmd=calibrate 到 aruco/stop 给板端 */
 function calibrate(){
   if(inlierIdx.length < 4){
     document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
@@ -445,8 +444,9 @@ function calibrate(){
   REF_X = cx; REF_Y = cy;
   calibrated = true;
   try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){}
-  publishCalibStatus(1);                       // 纠偏中
-  setTimeout(()=>publishCalibStatus(2), 500);  // 纠偏完成
+  // 发送校准命令给板端（发布到 aruco/stop）
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
   document.getElementById('hint').textContent='已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
   recompute();
 }

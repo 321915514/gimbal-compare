@@ -19,9 +19,9 @@ window.GIMBAL_CONFIG = {
     enabled: true,
     broker: "tcp://192.168.1.100:1883",    // EMQX
     clientId: "g20",
-    subscribe: "gimbal/real_dxdy",          // 真值（订阅）
-    publish: "gimbal/result",               // dx/dy 结果（发布）
-    calibCmd: "aruco/stop",                 // 校准命令（订阅）
-    calibStatus: "aruco/calibrate/status"   // 校准状态（发布）
+    subscribe: "gimbal/real_dxdy",          // 真值（订阅=收）
+    publish: "gimbal/result",               // dx/dy 结果（发布=发）
+    calibCmd: "aruco/stop",                 // 校准命令（发布=发，点「校准」发 {"cmd":"calibrate"}）
+    calibStatus: "aruco/calibrate/status"   // 校准状态（订阅=收，收 {"status":0/1/2} 显示）
   }
 };
