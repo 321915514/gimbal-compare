@@ -1,10 +1,10 @@
-// ENABLE_MQTT：编译期开关（gradle.properties 里配，或用 -PENABLE_MQTT=true 覆盖）
-def enableMqtt = (project.findProperty('ENABLE_MQTT') ?: 'false').toString().toBoolean()
-
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
 }
+
+// ENABLE_MQTT：编译期开关（gradle.properties 里配，或用 -PENABLE_MQTT=true 覆盖）
+def enableMqtt = (project.findProperty('ENABLE_MQTT') ?: 'false').toString().toBoolean()
 
 android {
     namespace 'com.example.annotation'
@@ -33,7 +33,7 @@ android {
         main {
             // MQTT 实现放独立源码目录 src/main/mqtt，只在 ENABLE_MQTT=true 时编译（不打包不增体积）
             if (enableMqtt) {
-                java.srcDirs += "src/main/mqtt"
+                java.srcDir("src/main/mqtt")
             }
         }
     }
