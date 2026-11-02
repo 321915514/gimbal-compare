@@ -316,7 +316,7 @@ function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.he
 }
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
-img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');recompute()};
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');document.getElementById('hint').textContent='已取帧，点「检测圆」或手动点孔标注';recompute()};
 img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
 new ResizeObserver(fit).observe(box);
 cv.addEventListener('pointerdown',e=>{

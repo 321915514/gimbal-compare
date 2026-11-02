@@ -107,7 +107,7 @@ class GimbalCompareActivity : Activity() {
         try {
             val lv = LibVLC(this, arrayListOf(
                 "--network-caching=300", "--live-caching=200",
-                "--drop-late-frames", "--skip-frames"))
+                "--drop-late-frames", "--skip-frames", "--rtsp-tcp"))
             libVLC = lv
             val mp = MediaPlayer(lv)
             mediaPlayer = mp
