@@ -1,0 +1,13 @@
+package com.example.annotation.mqttbridge
+
+/** MQTT 消息回调（App 侧实现） */
+interface IMqttListener {
+    fun onMessage(topic: String, payload: String)
+}
+
+/** MQTT 桥接口：实现类只在 ENABLE_MQTT=true 时编译进 APK，App 侧只依赖此接口 */
+interface IMqttBridge {
+    fun start(broker: String, clientId: String, subscribe: String, listener: IMqttListener)
+    fun publish(topic: String, payload: String)
+    fun stop()
+}

@@ -1,3 +1,6 @@
+// ENABLE_MQTT：编译期开关（gradle.properties 里配，或用 -PENABLE_MQTT=true 覆盖）
+def enableMqtt = (project.findProperty('ENABLE_MQTT') ?: 'false').toString().toBoolean()
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -17,6 +20,21 @@ android {
         // 只打包 arm64（G20 是 arm64），把 libvlc-all 里其他架构裁掉，APK 180MB -> ~50MB
         ndk {
             abiFilters "arm64-v8a"
+        }
+
+        buildConfigField "boolean", "ENABLE_MQTT", "$enableMqtt"
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    sourceSets {
+        main {
+            // MQTT 实现放独立源码目录 src/main/mqtt，只在 ENABLE_MQTT=true 时编译（不打包不增体积）
+            if (enableMqtt) {
+                java.srcDirs += "src/main/mqtt"
+            }
         }
     }
 
@@ -38,4 +56,7 @@ android {
 
 dependencies {
     implementation 'org.videolan.android:libvlc-all:3.6.0'
+    if (enableMqtt) {
+        implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+    }
 }

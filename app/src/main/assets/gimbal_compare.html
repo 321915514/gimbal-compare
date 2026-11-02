@@ -398,6 +398,29 @@ window.loadCompareFrame=function(url){
 window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
 window.setH=function(arr9){if(Array.isArray(arr9)&&arr9.length===9)H_STR=arr9.join(' ');recompute()};
 
+/* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
+function startMqttFromConfig(){
+  const m = (window.GIMBAL_CONFIG||{}).mqtt;
+  if(!m || !m.enabled) return;
+  if(window.G20 && window.G20.mqttStart){
+    window.G20.mqttStart(m.broker||'', m.clientId||'g20', m.subscribe||'');
+  }
+}
+window.onMqttMessage = function(topic, payload){
+  // 解析真值 dx/dy：{"dx":1.2,"dy":-3.4} 或 "1.2,-3.4"
+  try{
+    const o = JSON.parse(payload);
+    if(o.dx!=null && o.dy!=null) setRealDxdy(o.dx, o.dy);
+    else if(Array.isArray(o) && o.length>=2) setRealDxdy(Number(o[0]), Number(o[1]));
+  }catch(e){
+    const parts = payload.split(/[\s,]+/).map(Number);
+    if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])) setRealDxdy(parts[0], parts[1]);
+  }
+};
+window.mqttPublish = function(topic, payload){
+  if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
+};
+
 /* ================= 初始化 ================= */
 function applyConfig(){
   const CFG = (typeof window!=='undefined' && window.GIMBAL_CONFIG) || {};
@@ -438,6 +461,7 @@ function loadExternalConfig(){
   })();
 }
 applyConfig();
+startMqttFromConfig();
 loadSaved();recompute();
 loadExternalConfig();
 </script>

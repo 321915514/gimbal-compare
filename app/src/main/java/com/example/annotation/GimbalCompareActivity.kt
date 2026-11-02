@@ -20,6 +20,9 @@ import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import java.io.ByteArrayOutputStream
+import com.example.annotation.mqttbridge.IMqttBridge
+import com.example.annotation.mqttbridge.IMqttListener
+import org.json.JSONObject
 
 class GimbalCompareActivity : Activity() {
 
@@ -27,6 +30,7 @@ class GimbalCompareActivity : Activity() {
     private lateinit var rtspView: TextureView   // 隐藏的 RTSP 渲染目标（在 WebView 后面）
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
+    private var mqttBridge: IMqttBridge? = null
 
     // 抓帧分辨率：与 H 标定时吊舱帧分辨率一致（改这里）
     private val GRAB_W = 1280
@@ -35,6 +39,16 @@ class GimbalCompareActivity : Activity() {
     inner class Bridge {
         @JavascriptInterface
         fun grabFrame(rtspUrl: String) = runOnUiThread { grabRtspFrame(rtspUrl) }
+
+        @JavascriptInterface
+        fun mqttStart(broker: String, clientId: String, subscribe: String) {
+            runOnUiThread { startMqtt(broker, clientId, subscribe) }
+        }
+
+        @JavascriptInterface
+        fun mqttPublish(topic: String, payload: String) {
+            runOnUiThread { mqttBridge?.publish(topic, payload) }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -64,6 +78,27 @@ class GimbalCompareActivity : Activity() {
         val sdcardHtml = java.io.File("/sdcard/gimbal_compare.html")
         webView.loadUrl(if (sdcardHtml.exists()) "file:///sdcard/gimbal_compare.html"
                         else "file:///android_asset/gimbal_compare.html")
+    }
+
+    /** 反射加载 MqttManager（仅 ENABLE_MQTT=true 编译时存在），App 侧不硬依赖 Paho */
+    private fun startMqtt(broker: String, clientId: String, subscribe: String) {
+        if (!BuildConfig.ENABLE_MQTT) return
+        try {
+            val cls = Class.forName("com.example.annotation.mqtt.MqttManager")
+            val bridge = cls.getDeclaredConstructor().newInstance() as IMqttBridge
+            mqttBridge = bridge
+            bridge.start(broker, clientId, subscribe, object : IMqttListener {
+                override fun onMessage(topic: String, payload: String) {
+                    runOnUiThread {
+                        val t = JSONObject.quote(topic)
+                        val pl = JSONObject.quote(payload)
+                        webView.evaluateJavascript("window.onMqttMessage && window.onMqttMessage($t,$pl)", null)
+                    }
+                }
+            })
+        } catch (_: Exception) {
+            // MQTT 未编译进 APK 或加载失败，静默
+        }
     }
 
     /** 连 RTSP → play → 等第一帧 → TextureView 抓 Bitmap → JPEG base64 → 推回页面 */
@@ -157,5 +192,5 @@ class GimbalCompareActivity : Activity() {
     }
 
     override fun onResume() { super.onResume(); immersive() }
-    override fun onDestroy() { releasePlayer(); super.onDestroy() }
+    override fun onDestroy() { mqttBridge?.stop(); releasePlayer(); super.onDestroy() }
 }
