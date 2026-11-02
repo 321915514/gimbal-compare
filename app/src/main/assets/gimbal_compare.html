@@ -153,6 +153,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 
   <div class="toolbar">
     <button class="act primary" id="fetchFrame">📷 获取帧</button>
+    <button class="act" id="grabStereo">👁 获取双目</button>
     <button class="act" id="detect">⭕ 检测圆</button>
     <button class="act" id="calibrate">🎯 校准</button>
     <button class="act ghost" id="undo">撤销</button>
@@ -352,7 +353,17 @@ function fetchFrame(){
   if(!u){document.getElementById('hint').textContent='未配置帧源';return}
   spinner(true);setStat('取帧中…','busy');
   img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
+function grabStereo(){
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(!mcfg || !mcfg.enabled || !mcfg.stereoGrab){
+    document.getElementById('hint').textContent='MQTT 未启用或未配置双目取帧';
+    return;
+  }
+  spinner(true);setStat('取双目中…','busy');
+  mqttPublish(mcfg.stereoGrab, JSON.stringify({cmd:"grab"}));
+}
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
+document.getElementById('grabStereo').onclick=()=>grabStereo();
 document.getElementById('detect').onclick=()=>autoDetect();
 document.getElementById('calibrate').onclick=()=>calibrate();
 document.getElementById('undo').onclick=()=>{marks.pop();if(selected>=marks.length)selected=-1;draw();recompute()};
@@ -396,12 +407,30 @@ function startMqttFromConfig(){
   const m = (window.GIMBAL_CONFIG||{}).mqtt;
   if(!m || !m.enabled) return;
   if(window.G20 && window.G20.mqttStart){
-    const topics = [m.subscribe, m.calibStatus].filter(Boolean).join(',');
+    const topics = [m.subscribe, m.calibStatus, m.stereoImage].filter(Boolean).join(',');
     window.G20.mqttStart(m.broker||'', m.clientId||'g20', topics);
   }
 }
 window.onMqttMessage = function(topic, payload){
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  // 双目图返回（stereo/image，订阅收）
+  if(mcfg && mcfg.stereoImage && topic === mcfg.stereoImage){
+    try{
+      const o = JSON.parse(payload);
+      const img = o.img || o.image || o.data;
+      if(img){
+        const url = img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img;
+        loadCompareFrame(url);
+      } else {
+        spinner(false); setStat('取双目失败','');
+        document.getElementById('hint').textContent='双目图返回为空';
+      }
+    }catch(e){
+      spinner(false); setStat('取双目失败','');
+      document.getElementById('hint').textContent='双目图解析失败';
+    }
+    return;
+  }
   // 校准状态（aruco/calibrate/status，订阅收）
   if(mcfg && mcfg.calibStatus && topic === mcfg.calibStatus){
     try{
