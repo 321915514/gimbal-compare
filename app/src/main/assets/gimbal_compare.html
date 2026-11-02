@@ -379,6 +379,11 @@ function recompute(){
   inlierIdx=r.inliers;
   const dx=(BASE_X-r.cx)*Z/FX,dy=(BASE_Y-r.cy)*Z/FY;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
+  // 自动发布计算结果到 MQTT（若启用）
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(mcfg && mcfg.enabled && mcfg.publish){
+    try{ mqttPublish(mcfg.publish, JSON.stringify({dx:+dx.toFixed(2), dy:+dy.toFixed(2)})); }catch(e){}
+  }
   draw();
 }
 function setVerdict(txt,cls){}  // 结果区固定显示，动态提示已移除
@@ -408,13 +413,18 @@ function startMqttFromConfig(){
 }
 window.onMqttMessage = function(topic, payload){
   // 解析真值 dx/dy：{"dx":1.2,"dy":-3.4} 或 "1.2,-3.4"
+  let dx=null, dy=null;
   try{
     const o = JSON.parse(payload);
-    if(o.dx!=null && o.dy!=null) setRealDxdy(o.dx, o.dy);
-    else if(Array.isArray(o) && o.length>=2) setRealDxdy(Number(o[0]), Number(o[1]));
+    if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
+    else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
   }catch(e){
     const parts = payload.split(/[\s,]+/).map(Number);
-    if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])) setRealDxdy(parts[0], parts[1]);
+    if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
+  }
+  if(dx!=null && dy!=null){
+    setRealDxdy(dx, dy);
+    document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
   }
 };
 window.mqttPublish = function(topic, payload){
