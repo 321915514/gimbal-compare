@@ -9,24 +9,19 @@ window.GIMBAL_CONFIG = {
   // HTTP 抓帧地址（浏览器调试回退用，App 里不用）
   frameUrl: "http://127.0.0.1:8899/frame.jpg",
 
-  // 单应矩阵 H（行优先 9 个数）
-  H: "0.960786 0.113722 221.225764 0.041811 1.750072 55.030138 0.000008 0.00017 1.0",
+  // 简化算法：参考点 + 比例（不用 H 矩阵）
+  gimbalRefX: 640,   // 吊舱参考中心 X（现场校准后自动记，这里只是初值）
+  gimbalRefY: 360,   // 吊舱参考中心 Y
+  scale: 0.68,       // mm/px（现场标定：Z / f_吊舱）
 
-  // 双目内参 + 工作距离
-  Z: 731, fx: 1081.7555, fy: 1081.9276,
-
-  // 基准点
-  baseX: 787, baseY: 535,
-
-  // 偏差阈值 mm（预留）
-    threshold: 2,
-
-  // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效；enabled=false 不连接）
+  // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效）
   mqtt: {
     enabled: true,
-    broker: "tcp://192.168.1.100:1883",   // 板端 EMQX broker
+    broker: "tcp://192.168.1.100:1883",    // EMQX
     clientId: "g20",
-    subscribe: "gimbal/real_dxdy",         // 订阅双目/云台真值
-    publish: "gimbal/result"               // 发布本机计算结果
+    subscribe: "gimbal/real_dxdy",          // 真值（订阅）
+    publish: "gimbal/result",               // dx/dy 结果（发布）
+    calibCmd: "aruco/stop",                 // 校准命令（订阅）
+    calibStatus: "aruco/calibrate/status"   // 校准状态（发布）
   }
 };

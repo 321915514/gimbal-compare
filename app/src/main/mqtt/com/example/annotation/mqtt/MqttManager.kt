@@ -24,7 +24,8 @@ class MqttManager : IMqttBridge {
                     keepAliveInterval = 30
                 }
                 c.connect(opts)
-                if (subscribe.isNotEmpty()) {
+                val topics = subscribe.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                if (topics.isNotEmpty()) {
                     c.setCallback(object : MqttCallback {
                         override fun connectionLost(cause: Throwable?) {}
                         override fun messageArrived(topic: String, msg: MqttMessage) {
@@ -34,7 +35,7 @@ class MqttManager : IMqttBridge {
                         }
                         override fun deliveryComplete(token: IMqttDeliveryToken?) {}
                     })
-                    c.subscribe(subscribe)
+                    c.subscribe(topics.toTypedArray())
                 }
             } catch (_: Exception) {
                 // 连不上不影响主功能，静默

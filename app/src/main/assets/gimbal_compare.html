@@ -153,7 +153,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   <div class="toolbar">
     <button class="act primary" id="fetchFrame">📷 获取帧</button>
     <button class="act" id="detect">⭕ 检测圆</button>
-    <button class="act" id="send">📤 发送</button>
+    <button class="act" id="calibrate">🎯 校准</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
     <div class="legend">
@@ -227,12 +227,6 @@ function snapImageData(id,u,v,opts){const o=Object.assign({},DEFAULTS,opts||{});
   if(n<o.minArea)return null;
   return{cx:x0+sumx/n,cy:y0+sumy/n,r:Math.sqrt(n/Math.PI),area:n}}
 
-/* ================= 数学 ================= */
-function applyH(H,x,y){const w=H[6]*x+H[7]*y+H[8];
-  return[(H[0]*x+H[1]*y+H[2])/w,(H[3]*x+H[4]*y+H[5])/w]}
-function parseH(t){const nums=t.replace(/[\[\]]/g,' ').split(/[\s,;]+/).filter(s=>s.length).map(Number);
-  return(nums.length===9&&!nums.some(isNaN))?nums:null}
-
 /* ============ RANSAC 鲁棒质心：挑最像矩形的 4 个点，剔除误点的圆 ============ */
 function parallelogramResidual(p){const cx=(p[0].x+p[1].x+p[2].x+p[3].x)/4,cy=(p[0].y+p[1].y+p[2].y+p[3].y)/4;
   const q=p.slice().sort((a,b)=>Math.atan2(a.y-cy,a.x-cx)-Math.atan2(b.y-cy,b.x-cx));
@@ -287,10 +281,9 @@ function autoDetect(){
 }
 
 /* ============ 预置常量（部署时替换） ============ */
-const H_FALLBACK = "0.960786 0.113722 221.225764 0.041811 1.750072 55.030138 0.000008 0.00017 1.0";
 const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
-let H_STR = H_FALLBACK, DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
-let Z = 731, FX = 1081.7555, FY = 1081.9276, BASE_X = 787, BASE_Y = 535, THR = 2;
+let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
+let REF_X = 640, REF_Y = 360, SCALE = 0.68, calibrated = false;
 
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -360,37 +353,34 @@ function fetchFrame(){
   img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
 document.getElementById('detect').onclick=()=>autoDetect();
-document.getElementById('send').onclick=()=>sendResult();
+document.getElementById('calibrate').onclick=()=>calibrate();
 document.getElementById('undo').onclick=()=>{marks.pop();if(selected>=marks.length)selected=-1;draw();recompute()};
 document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recompute()};
 
 /* ================= 结果计算 ================= */
 const $=id=>document.getElementById(id);
-function getH(){return parseH(H_STR)}
 function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
-  const H=getH();
-  if(!H){$('vgdx').textContent='—';$('vgdy').textContent='—';inlierIdx=[];lastDx=lastDy=null;draw();return}
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     inlierIdx=[];lastDx=lastDy=null;draw();return}
-  const mp=marks.map(m=>{const q=applyH(H,m.cx,m.cy);return{x:q[0],y:q[1]}});
+  const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
   const r=robustCentroid(mp);
   if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
   inlierIdx=r.inliers;
-  const dx=(BASE_X-r.cx)*Z/FX,dy=(BASE_Y-r.cy)*Z/FY;
+  const dx=(REF_X-r.cx)*SCALE, dy=(REF_Y-r.cy)*SCALE;   // 简化：参考点 + 比例
   lastDx=dx; lastDy=dy;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
+  // 已校准后自动发布 dx/dy（发送 MQTT 保留）
+  if(calibrated){
+    const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+    if(mcfg && mcfg.enabled && mcfg.publish){
+      try{ mqttPublish(mcfg.publish, JSON.stringify({dx:+dx.toFixed(2), dy:+dy.toFixed(2)})); }catch(e){}
+    }
+  }
   draw();
 }
-function setVerdict(txt,cls){}  // 结果区固定显示，动态提示已移除
-
-/* ================= 持久化（H/真值） ================= */
-function loadSaved(){try{const s=localStorage.getItem('gimbal_cmp');
-  if(s){const o=JSON.parse(s);if(o.H)H_STR=o.H}}catch(_){}}
-window.addEventListener('beforeunload',()=>{try{localStorage.setItem('gimbal_cmp',JSON.stringify(
-  {H:H_STR}))}catch(_){}});
 
 /* ================= 安卓 WebView 桥 ================= */
 window.loadCompareFrame=function(url){
@@ -399,62 +389,81 @@ window.loadCompareFrame=function(url){
   img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
 };
 window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
-window.setH=function(arr9){if(Array.isArray(arr9)&&arr9.length===9)H_STR=arr9.join(' ');recompute()};
 
 /* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
 function startMqttFromConfig(){
   const m = (window.GIMBAL_CONFIG||{}).mqtt;
   if(!m || !m.enabled) return;
   if(window.G20 && window.G20.mqttStart){
-    window.G20.mqttStart(m.broker||'', m.clientId||'g20', m.subscribe||'');
+    const topics = [m.subscribe, m.calibCmd].filter(Boolean).join(',');
+    window.G20.mqttStart(m.broker||'', m.clientId||'g20', topics);
   }
 }
 window.onMqttMessage = function(topic, payload){
-  // 解析真值 dx/dy：{"dx":1.2,"dy":-3.4} 或 "1.2,-3.4"
-  let dx=null, dy=null;
-  try{
-    const o = JSON.parse(payload);
-    if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
-    else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
-  }catch(e){
-    const parts = payload.split(/[\s,]+/).map(Number);
-    if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  // 校准命令（aruco/stop）
+  if(mcfg && mcfg.calibCmd && topic === mcfg.calibCmd){
+    try{
+      const o = JSON.parse(payload);
+      if(o.cmd === 'calibrate') calibrate();
+    }catch(e){}
+    return;
   }
-  if(dx!=null && dy!=null){
-    setRealDxdy(dx, dy);
-    document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+  // 真值 dx/dy（gimbal/real_dxdy）
+  if(mcfg && mcfg.subscribe && topic === mcfg.subscribe){
+    let dx=null, dy=null;
+    try{
+      const o = JSON.parse(payload);
+      if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
+      else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
+    }catch(e){
+      const parts = payload.split(/[\s,]+/).map(Number);
+      if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
+    }
+    if(dx!=null && dy!=null){
+      setRealDxdy(dx, dy);
+      document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+    }
   }
 };
 window.mqttPublish = function(topic, payload){
   if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
 };
-/* 手动调准后点「发送」，不自动发 */
-function sendResult(){
+/* 校准：记下当前四孔中心为参考点（按钮点、或 MQTT aruco/stop 收 cmd=calibrate 触发） */
+function publishCalibStatus(status){
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-  if(!mcfg || !mcfg.enabled || !mcfg.publish){
-    document.getElementById('hint').textContent='MQTT 未启用';
+  if(mcfg && mcfg.calibStatus) mqttPublish(mcfg.calibStatus, JSON.stringify({status:status}));
+}
+function calibrate(){
+  if(inlierIdx.length < 4){
+    document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
     return;
   }
-  if(lastDx==null || lastDy==null){
-    document.getElementById('hint').textContent='未标满 4 个孔，无法发送';
-    return;
-  }
-  mqttPublish(mcfg.publish, JSON.stringify({dx:+lastDx.toFixed(2), dy:+lastDy.toFixed(2)}));
-  document.getElementById('hint').textContent='已发送: dx='+lastDx.toFixed(2)+'  dy='+lastDy.toFixed(2);
+  const pts = inlierIdx.map(i=>marks[i]);
+  const cx = pts.reduce((s,m)=>s+m.cx,0)/4;
+  const cy = pts.reduce((s,m)=>s+m.cy,0)/4;
+  REF_X = cx; REF_Y = cy;
+  calibrated = true;
+  try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){}
+  publishCalibStatus(1);                       // 纠偏中
+  setTimeout(()=>publishCalibStatus(2), 500);  // 纠偏完成
+  document.getElementById('hint').textContent='已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
+  recompute();
 }
 
 /* ================= 初始化 ================= */
 function applyConfig(){
   const CFG = (typeof window!=='undefined' && window.GIMBAL_CONFIG) || {};
-  H_STR = CFG.H || H_FALLBACK;
   DEFAULT_FRAME_URL = CFG.frameUrl || URL_FALLBACK;
   DEFAULT_RTSP = CFG.rtspUrl || '';
-  if(CFG.Z!=null)Z=CFG.Z;
-  if(CFG.fx!=null)FX=CFG.fx;
-  if(CFG.fy!=null)FY=CFG.fy;
-  if(CFG.baseX!=null)BASE_X=CFG.baseX;
-  if(CFG.baseY!=null)BASE_Y=CFG.baseY;
-  if(CFG.threshold!=null)THR=CFG.threshold;
+  if(CFG.gimbalRefX!=null)REF_X=CFG.gimbalRefX;
+  if(CFG.gimbalRefY!=null)REF_Y=CFG.gimbalRefY;
+  if(CFG.scale!=null)SCALE=CFG.scale;
+  // 恢复已保存的校准参考点
+  try{
+    const s=localStorage.getItem('gimbal_ref');
+    if(s){const o=JSON.parse(s);if(o.x!=null&&o.y!=null){REF_X=o.x;REF_Y=o.y;calibrated=true;}}
+  }catch(e){}
   recompute();
 }
 /* 现场免重打包：HBuilder 运行时读 /sdcard/gimbal_config.json 覆盖内置配置 */
@@ -484,7 +493,7 @@ function loadExternalConfig(){
 }
 applyConfig();
 startMqttFromConfig();
-loadSaved();recompute();
+recompute();
 loadExternalConfig();
 </script>
 </body>
