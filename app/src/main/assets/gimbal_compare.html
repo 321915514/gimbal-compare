@@ -41,7 +41,7 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;padding-bottom:18px}
 .main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none}
 .main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
-.side{width:235px;min-width:0;overflow:hidden;padding:11px;display:flex;flex-direction:column;gap:11px;
+.side{width:235px;min-width:0;overflow:hidden;padding:11px;display:flex;flex-direction:column;justify-content:flex-start;gap:11px;
   background:var(--bg2);touch-action:none}
 .side .panel{margin:0}
 .side details{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
@@ -172,7 +172,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，点孔标注（自动吸附），点圆选中后按钮微调</div>
     </div>
     <div class="side">
-  <div class="panel" style="margin-bottom:calc(13px + env(safe-area-inset-bottom))">
+  <div class="panel">
     <h3>计算结果 · 中心为四孔对角线交点</h3>
     <div class="cmp">
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
