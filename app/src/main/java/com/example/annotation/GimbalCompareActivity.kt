@@ -66,6 +66,7 @@ class GimbalCompareActivity : Activity() {
         webView.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         val root = FrameLayout(this)
+        root.fitsSystemWindows = true   // 内容适配系统栏（老 Android 也生效），整体在导航栏/状态栏之内
         root.addView(rtspView)
         root.addView(webView)   // WebView 盖住 TextureView（不透明，用户看不到 RTSP 画面）
         setContentView(root)
