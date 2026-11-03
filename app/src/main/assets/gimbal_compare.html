@@ -479,6 +479,10 @@ function calibrate(){
     document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
     return;
   }
+  if(lastDx == null || lastDy == null){
+    document.getElementById('hint').textContent='dx/dy 未计算，请先标注四孔再校准';
+    return;
+  }
   const pts = inlierIdx.map(i=>marks[i]);
   const cx = pts.reduce((s,m)=>s+m.cx,0)/4;
   const cy = pts.reduce((s,m)=>s+m.cy,0)/4;
