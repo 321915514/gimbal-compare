@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.view.Gravity
@@ -53,6 +54,10 @@ class GimbalCompareActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 内容适配系统栏：导航栏/状态栏不遮挡页面（显示底部导航按钮后，内容不被盖住）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+        }
 
         // TextureView（渲染 RTSP，抓帧用）在 WebView 后面
         rtspView = TextureView(this)
