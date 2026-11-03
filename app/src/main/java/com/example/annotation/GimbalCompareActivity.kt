@@ -54,6 +54,7 @@ class GimbalCompareActivity : Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WebView.setWebContentsDebuggingEnabled(true)   // 调试用：允许 chrome://inspect 查看 DOM
         // 内容适配系统栏：导航栏/状态栏不遮挡页面（显示底部导航按钮后，内容不被盖住）
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(true)
