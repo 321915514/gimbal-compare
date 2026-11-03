@@ -16,20 +16,20 @@ html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(160deg
   color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
   overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh}
-header{display:flex;align-items:center;gap:12px;padding:12px 18px;padding-top:calc(12px + env(safe-area-inset-top));
+header{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));
   background:rgba(18,26,46,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);flex:none}
 .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
   display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex:none}
-header .t{font-size:16px;font-weight:700;letter-spacing:.5px}
-header .t small{display:block;font-size:10px;color:var(--muted);font-weight:400;letter-spacing:.2px;margin-top:-1px}
+header .t{font-size:13px;font-weight:700;letter-spacing:.4px}
+header .t small{display:inline;font-size:9px;color:var(--muted);font-weight:400;letter-spacing:.2px;margin-left:7px}
 header .sp{flex:1}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
   background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:5px 12px}
 .pill .dot{width:7px;height:7px;border-radius:50%;background:#4a5870}
 .pill.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
 .pill.busy .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
-.toolbar{display:flex;gap:9px;padding:12px 18px;flex:none;align-items:center}
-button.act{height:42px;padding:0 16px;border-radius:11px;border:1px solid var(--border);background:var(--panel2);
+.toolbar{display:flex;gap:8px;padding:8px 14px;flex:none;align-items:center}
+button.act{height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);font-size:13px;font-weight:600;cursor:pointer;transition:.14s;white-space:nowrap}
 button.act:active{transform:scale(.95)}
 button.act.ghost{background:transparent;color:var(--muted)}
@@ -123,15 +123,15 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
-.dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);
-  grid-template-areas:". up ." "left . right" ". down .";gap:5px;justify-content:center;margin-top:11px}
-.dpad .nav{height:44px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+.dpad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:8px}
+.dpad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);font-size:16px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dpad .nav:active{transform:scale(.88);background:var(--panel)}
 #mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
-.sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
-.sizepad .nav{height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+.sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.sizepad .nav{height:36px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .sizepad .nav:active{transform:scale(.94);background:var(--panel)}
