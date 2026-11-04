@@ -53,9 +53,9 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .hintbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;color:var(--muted);
   background:rgba(5,7,15,.82);padding:6px 15px;border-radius:20px;pointer-events:none;white-space:nowrap;
   border:1px solid var(--border)}
-.panel{margin:11px 18px 0;padding:13px 15px;border-radius:14px;background:var(--panel);
+.panel{margin:11px 18px 0;padding:8px 12px;border-radius:14px;background:var(--panel);
   border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.25);flex:none}
-.panel h3{margin:0 0 10px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:1px;
+.panel h3{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:1px;
   text-transform:uppercase;display:flex;align-items:center;gap:7px}
 .panel h3::before{content:'';width:3px;height:13px;border-radius:2px;
   background:linear-gradient(180deg,var(--accent),var(--accent2))}
@@ -118,9 +118,9 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
-.dpad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);
-  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:8px}
-.dpad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+.dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(3,34px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:6px}
+.dpad .nav{height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);font-size:16px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dpad .nav:active{transform:scale(.88);background:var(--panel)}
