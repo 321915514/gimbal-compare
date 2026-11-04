@@ -17,7 +17,7 @@ window.GIMBAL_CONFIG = {
   // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效）
   mqtt: {
     enabled: true,
-    broker: "tcp://192.168.1.100:1883",    // EMQX
+    broker: "tcp://192.168.3.78:1883,tcp://192.168.2.82:1883",  // 候选列表，连上哪个用哪个
     clientId: "g20",
     subscribe: "gimbal/real_dxdy",          // 真值（订阅=收）
     publish: "gimbal/result",               // dx/dy 结果（发布=发）
