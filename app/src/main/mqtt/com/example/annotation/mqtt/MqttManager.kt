@@ -8,6 +8,7 @@ import org.eclipse.paho.client.mqttv3.MqttClient
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 基于 Paho 的 MQTT 客户端。仅在 ENABLE_MQTT=true 时编译进 APK。
@@ -25,6 +26,7 @@ class MqttManager : IMqttBridge {
     @Volatile private var subscribeTopics: String = ""
     @Volatile private var listener: IMqttListener? = null
     private val running = AtomicBoolean(false)
+    private val gen = AtomicInteger(0)
 
     override fun start(broker: String, clientId: String, subscribe: String, listener: IMqttListener) {
         brokers = broker.split(',').map { it.trim() }.filter { it.isNotEmpty() }
@@ -32,12 +34,18 @@ class MqttManager : IMqttBridge {
         subscribeTopics = subscribe
         this.listener = listener
         if (brokers.isEmpty()) return
-        if (running.getAndSet(true)) return   // 已在跑，避免重复线程
-        Thread { connectLoop() }.start()
+        val myGen = gen.incrementAndGet()          // 递增代数，使旧连接线程自行退出
+        try { client?.disconnect() } catch (_: Exception) {}
+        try { client?.close() } catch (_: Exception) {}
+        client = null
+        running.set(true)
+        Thread { connectLoop(myGen) }.start()
     }
 
-    private fun connectLoop() {
-        while (running.get()) {
+    override fun isConnected(): Boolean = client?.isConnected == true
+
+    private fun connectLoop(myGen: Int) {
+        while (running.get() && gen.get() == myGen) {
             for (b in brokers) {
                 if (!running.get()) return
                 try {
@@ -96,6 +104,7 @@ class MqttManager : IMqttBridge {
     }
 
     override fun stop() {
+        gen.incrementAndGet()
         running.set(false)
         try { client?.disconnect() } catch (_: Exception) {}
         try { client?.close() } catch (_: Exception) {}

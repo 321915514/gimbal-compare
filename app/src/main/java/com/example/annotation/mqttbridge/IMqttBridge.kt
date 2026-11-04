@@ -10,4 +10,6 @@ interface IMqttBridge {
     fun start(broker: String, clientId: String, subscribe: String, listener: IMqttListener)
     fun publish(topic: String, payload: String)
     fun stop()
+    /** 当前是否已连上 broker（供设置页自测/状态显示用） */
+    fun isConnected(): Boolean
 }

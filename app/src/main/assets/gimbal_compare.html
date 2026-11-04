@@ -118,6 +118,30 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .spinner.show{display:block}
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
+/* ===== 设置页 ===== */
+#settingsMask{position:fixed;inset:0;background:rgba(3,6,14,.75);display:none;z-index:40}
+#settingsMask.show{display:block}
+.sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(600px,94vw);max-height:90vh;
+  display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 18px 50px rgba(0,0,0,.65)}
+.sheet .head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;
+  border-bottom:1px solid var(--border);font-size:13px;font-weight:700}
+.sheet .sc{overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:9px}
+.sheet .foot{display:flex;gap:8px;justify-content:flex-end;padding:9px 14px;border-top:1px solid var(--border)}
+.sheet label.row{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
+.sheet input,.sheet textarea{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  color:var(--fg);font-size:12px;padding:5px 8px;font-family:Consolas,monospace}
+.sheet textarea{resize:vertical;min-height:40px}
+.sheet input[type=checkbox]{width:auto}
+.sheet .sec{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px;margin-top:3px}
+.sheet .tr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.sheet .bt{cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--fg);
+  border-radius:8px;padding:6px 13px;font-size:12px}
+.sheet .bt.pri{background:var(--accent);border-color:transparent;color:#fff;font-weight:700}
+.sheet details summary{font-size:11.5px;color:var(--muted);cursor:pointer;padding:3px 0;user-select:none}
+#stOut{font-family:Consolas,monospace;font-size:11.5px;line-height:1.65;white-space:pre-wrap;
+  background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:7px 9px;min-height:32px}
+#setTestOut.ok{color:#22c55e}#setTestOut.bad{color:#ff5d5d}
 /* 十字方向键（小按钮） + 圆大小按钮 */
 .dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);
   grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:auto}
@@ -154,6 +178,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <button class="act" id="calibrate">🎯 校准</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
+    <button class="act ghost" id="btnSettings" title="设置">⚙️</button>
     <div class="legend">
       <span class="lg"><i style="background:#22c55e"></i>计算用</span>
       <span class="lg"><i style="background:#ff5d5d"></i>已剔除</span>
@@ -187,6 +212,45 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ===== 设置页 ===== -->
+<div id="settingsMask">
+  <div class="sheet">
+    <div class="head"><span>⚙️ 设置</span><button class="bt" id="setClose">关闭</button></div>
+    <div class="sc">
+      <div class="sec">网络</div>
+      <label class="row">MQTT broker（可填多个，逗号分隔，连上哪个用哪个）
+        <textarea id="setBroker" rows="2" placeholder="tcp://192.168.3.78:1883,tcp://192.168.2.82:1883"></textarea>
+      </label>
+      <div class="tr"><button class="bt" id="setTestBroker">测试当前连接</button><span id="setTestOut">—</span></div>
+      <label class="row">吊舱 RTSP<input id="setRtsp" placeholder="rtsp://192.168.3.78:8554/test" /></label>
+
+      <div class="sec">标定</div>
+      <label class="row">scale（mm/px）<input id="setScale" type="number" step="0.001" /></label>
+      <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
+
+      <details>
+        <summary>高级：MQTT 话题与客户端（一般不用改）</summary>
+        <label class="row">真值订阅 subscribe<input id="setSub" /></label>
+        <label class="row">结果发布 publish<input id="setPub" /></label>
+        <label class="row">校准命令 calibCmd<input id="setCalibCmd" /></label>
+        <label class="row">校准状态 calibStatus<input id="setCalibStatus" /></label>
+        <label class="row">双目请求 stereoGrab<input id="setSgrab" /></label>
+        <label class="row">双目返回 stereoImage<input id="setSimage" /></label>
+        <label class="row">clientId<input id="setClientId" /></label>
+        <label class="row">MQTT 开关<input id="setMqttOn" type="checkbox" /></label>
+      </details>
+
+      <div class="sec">功能自测</div>
+      <div class="tr">
+        <button class="bt" id="setSelfTest">开始自测</button>
+        <button class="bt" id="setReset">恢复出厂默认</button>
+      </div>
+      <div id="stOut">点「开始自测」逐项检查：配置格式 → MQTT 连接 → 双目取帧往返 → 真值/校准话题 → 画面与存储</div>
+    </div>
+    <div class="foot"><button class="bt pri" id="setSave">保存并应用</button></div>
   </div>
 </div>
 
@@ -408,6 +472,7 @@ function startMqttFromConfig(){
   }
 }
 window.onMqttMessage = function(topic, payload){
+  try{ (window.__lastMsgAt = window.__lastMsgAt || {})[topic] = Date.now(); }catch(e){}
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
   // 双目图返回（stereo/image，订阅收）
   if(mcfg && mcfg.stereoImage && topic === mcfg.stereoImage){
@@ -538,6 +603,114 @@ function loadExternalConfig(){
     }, tryNext);
   })();
 }
+/* ================= 设置页 ================= */
+const SETTINGS_KEY='gimbal_settings_v1';
+const SET_FIELDS=[
+  ['setBroker','mqtt.broker'],['setRtsp','rtspUrl'],['setScale','scale'],
+  ['setSub','mqtt.subscribe'],['setPub','mqtt.publish'],
+  ['setCalibCmd','mqtt.calibCmd'],['setCalibStatus','mqtt.calibStatus'],
+  ['setSgrab','mqtt.stereoGrab'],['setSimage','mqtt.stereoImage'],
+  ['setClientId','mqtt.clientId']
+];
+function cfgGet(path){ return path.split('.').reduce((o,k)=>(o==null?undefined:o[k]), window.GIMBAL_CONFIG||{}); }
+function cfgSet(path,v){ const ks=path.split('.'); let o=window.GIMBAL_CONFIG||(window.GIMBAL_CONFIG={});
+  for(let i=0;i<ks.length-1;i++){ o[ks[i]]=o[ks[i]]||{}; o=o[ks[i]]; } o[ks[ks.length-1]]=v; }
+function cfgMerge(base,over){ const out=Object.assign({},base||{});
+  Object.keys(over||{}).forEach(k=>{ const v=over[k];
+    if(v&&typeof v==='object'&&!Array.isArray(v)&&base&&typeof base[k]==='object') out[k]=cfgMerge(base[k],v);
+    else out[k]=v; });
+  return out; }
+function loadSettings(){
+  try{ const raw=localStorage.getItem(SETTINGS_KEY); if(!raw) return;
+    const o=JSON.parse(raw); if(o&&typeof o==='object') window.GIMBAL_CONFIG=cfgMerge(window.GIMBAL_CONFIG,o);
+  }catch(e){}
+}
+function openSettings(){
+  SET_FIELDS.forEach(([id,p])=>{ const el=document.getElementById(id); if(el) el.value=(cfgGet(p)!=null?cfgGet(p):''); });
+  const on=document.getElementById('setMqttOn'); if(on) on.checked=!!cfgGet('mqtt.enabled');
+  const ref=document.getElementById('setRef');
+  if(ref) ref.textContent='参考点 X='+Number(REF_X).toFixed(1)+'  Y='+Number(REF_Y).toFixed(1)+(calibrated?'（已校准）':'（默认）');
+  document.getElementById('settingsMask').classList.add('show');
+}
+function closeSettings(){ document.getElementById('settingsMask').classList.remove('show'); }
+function saveSettings(){
+  SET_FIELDS.forEach(([id,p])=>{ const el=document.getElementById(id); if(!el) return;
+    let v=el.value.trim(); if(p==='scale') v=Number(v)||0; cfgSet(p,v); });
+  const on=document.getElementById('setMqttOn'); if(on) cfgSet('mqtt.enabled', !!on.checked);
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(window.GIMBAL_CONFIG)); }catch(e){}
+  applyConfig(); startMqttFromConfig(); closeSettings();
+  document.getElementById('hint').textContent='设置已保存并应用';
+}
+function resetSettings(){
+  if(!confirm('恢复出厂默认？当前设置会被清除。')) return;
+  try{ localStorage.removeItem(SETTINGS_KEY); }catch(e){}
+  location.reload();
+}
+function resetRefPoint(){
+  try{ localStorage.removeItem('gimbal_ref'); }catch(e){}
+  calibrated=false;
+  REF_X=(window.GIMBAL_CONFIG||{}).gimbalRefX||REF_X;
+  REF_Y=(window.GIMBAL_CONFIG||{}).gimbalRefY||REF_Y;
+  recompute();
+  const ref=document.getElementById('setRef');
+  if(ref) ref.textContent='参考点 X='+Number(REF_X).toFixed(1)+'  Y='+Number(REF_Y).toFixed(1)+'（默认）';
+}
+async function runSelfTest(){
+  const out=document.getElementById('stOut'); const lines=[];
+  const add=(name,st,detail)=>{ const ico=st===true?'✅':(st===false?'❌':'⚠️');
+    lines.push(ico+' '+name+(detail?('：'+detail):'')); out.textContent=lines.join('\n'); };
+  out.textContent='检查中…';
+  const lm=window.__lastMsgAt||{};
+  const broker=String(cfgGet('mqtt.broker')||'').trim();
+  const list=broker.split(',').map(s=>s.trim()).filter(Boolean);
+  const bad=list.filter(b=>!/^tcp:\/\/[^\s:,]+:\d+$/.test(b));
+  add('配置·broker 格式', (list.length>0&&bad.length===0), bad.length?('非法 '+bad.join(' ')):(list.length+' 个候选'));
+  const sc=Number(cfgGet('scale'));
+  add('配置·scale', sc>0.01&&sc<10, sc+' mm/px');
+  const rtsp=String(cfgGet('rtspUrl')||'');
+  add('配置·RTSP 地址', /^rtsp:\/\//.test(rtsp), rtsp||'(空)');
+  let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+  add('MQTT 连接', conn, conn?'已连接':'未连接');
+  if(conn){
+    const imgTopic=cfgGet('mqtt.stereoImage')||'stereo/image';
+    const grabTopic=cfgGet('mqtt.stereoGrab')||'stereo/grab';
+    const before=lm[imgTopic]||0; const t0=Date.now();
+    mqttPublish(grabTopic, JSON.stringify({cmd:'grab'}));
+    let got=false;
+    for(let i=0;i<40&&!got;i++){ await new Promise(r=>setTimeout(r,200)); got=(lm[imgTopic]||0)>before; }
+    add('双目取帧往返', got, got?('耗时 '+(Date.now()-t0)+' ms'):'8 秒内未收到');
+    const now=Date.now();
+    const realT=String(cfgGet('mqtt.subscribe')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const hitReal=realT.some(t=>now-(lm[t]||0)<10000);
+    add('真值话题近期数据', hitReal?'warn':hitReal, realT.join(' | ')||'(未配置)');
+    const csT=cfgGet('mqtt.calibStatus');
+    const hitCs=csT&&(now-(lm[csT]||0)<60000);
+    add('校准状态话题', hitCs?'warn':hitCs, csT||'(未配置)');
+  } else {
+    add('双目取帧往返', false, '未连接，跳过');
+  }
+  const hasImg=(typeof img!=='undefined')&&img&&img.width>0;
+  add('画面已加载图像', hasImg?'warn':hasImg, hasImg?(img.width+'×'+img.height):'未取帧');
+  let ls=false; try{ localStorage.setItem('__st','1'); localStorage.removeItem('__st'); ls=true; }catch(e){}
+  add('本地存储可用', ls);
+  const fail=lines.filter(l=>l.indexOf('❌')===0).length;
+  out.textContent=lines.concat(['', fail?('共 '+fail+' 项失败'):'全部通过']).join('\n');
+}
+(function bindSettings(){
+  const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); };
+  on('btnSettings','click',openSettings);
+  on('setClose','click',closeSettings);
+  on('setSave','click',saveSettings);
+  on('setReset','click',resetSettings);
+  on('setResetRef','click',resetRefPoint);
+  on('setSelfTest','click',runSelfTest);
+  on('setTestBroker','click',()=>{
+    let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+    const out=document.getElementById('setTestOut');
+    out.textContent=conn?'已连接':'未连接'; out.className=conn?'ok':'bad';
+  });
+})();
+loadSettings();
 applyConfig();
 startMqttFromConfig();
 recompute();
