@@ -49,6 +49,9 @@ class GimbalCompareActivity : Activity() {
         fun mqttPublish(topic: String, payload: String) {
             runOnUiThread { mqttBridge?.publish(topic, payload) }
         }
+
+        @JavascriptInterface
+        fun mqttIsConnected(): Boolean = mqttBridge?.isConnected() == true
     }
 
     @SuppressLint("SetJavaScriptEnabled")
