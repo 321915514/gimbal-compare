@@ -141,7 +141,13 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .sheet details summary{font-size:11.5px;color:var(--muted);cursor:pointer;padding:3px 0;user-select:none}
 #stOut{font-family:Consolas,monospace;font-size:11.5px;line-height:1.65;white-space:pre-wrap;
   background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:7px 9px;min-height:32px}
-#setTestOut.ok{color:#22c55e}#setTestOut.bad{color:#ff5d5d}
+#setTestOut.ok,#setRtspOut.ok{color:#22c55e}#setTestOut.bad,#setRtspOut.bad{color:#ff5d5d}
+/* 校准期间全局锁定 */
+#lockMask{position:fixed;inset:0;display:none;z-index:38;background:rgba(3,6,14,.58);
+  align-items:center;justify-content:center}
+#lockMask.show{display:flex}
+#lockMask .box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  padding:16px 28px;font-size:14px;font-weight:700;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
 .dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);
   grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:auto}
@@ -224,8 +230,13 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <label class="row">MQTT broker（可填多个，逗号分隔，连上哪个用哪个）
         <textarea id="setBroker" rows="2" placeholder="tcp://192.168.3.78:1883,tcp://192.168.2.82:1883"></textarea>
       </label>
-      <div class="tr"><button class="bt" id="setTestBroker">测试当前连接</button><span id="setTestOut">—</span></div>
+      <div class="tr">
+        <button class="bt" id="setTestBroker">测试 broker</button>
+        <span id="setTestOut">—</span>
+        <span id="setLiveConn" style="margin-left:auto">当前连接：—</span>
+      </div>
       <label class="row">吊舱 RTSP<input id="setRtsp" placeholder="rtsp://192.168.3.78:8554/test" /></label>
+      <div class="tr"><button class="bt" id="setTestRtsp">测试 RTSP</button><span id="setRtspOut">—</span></div>
 
       <div class="sec">标定</div>
       <label class="row">scale（mm/px）<input id="setScale" type="number" step="0.001" /></label>
@@ -253,6 +264,9 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <div class="foot"><button class="bt pri" id="setSave">保存并应用</button></div>
   </div>
 </div>
+
+<!-- ===== 校准锁定遮罩 ===== -->
+<div id="lockMask"><div class="box" id="lockText">⏳ 校准中，请稍候…</div></div>
 
 <script>
 'use strict';
@@ -499,6 +513,7 @@ window.onMqttMessage = function(topic, payload){
       const names = ['未纠偏','纠偏中','纠偏完成'];
       if(o.status!=null){
         updateCalibButton(o.status);
+        if(o.status===2 || o.status===0) lockUI(false);   // 完成或未纠偏：解除全局锁定
         document.getElementById('hint').textContent = '校准状态: ' + (names[o.status] || ('状态'+o.status));
       }
     }catch(e){}
@@ -559,6 +574,7 @@ function calibrate(){
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
   if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
   updateCalibButton(1);  // 立即置「校准中」禁点
+  lockUIFor(60000, '⏳ 校准中，请稍候…');   // 校准期间全局锁定，收到完成/失败状态或 60s 超时解锁
   document.getElementById('hint').textContent='已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
   recompute();
 }
@@ -630,6 +646,7 @@ function openSettings(){
   const on=document.getElementById('setMqttOn'); if(on) on.checked=!!cfgGet('mqtt.enabled');
   const ref=document.getElementById('setRef');
   if(ref) ref.textContent='参考点 X='+Number(REF_X).toFixed(1)+'  Y='+Number(REF_Y).toFixed(1)+(calibrated?'（已校准）':'（默认）');
+  try{ refreshLiveConn(); }catch(e){}
   document.getElementById('settingsMask').classList.add('show');
 }
 function closeSettings(){ document.getElementById('settingsMask').classList.remove('show'); }
@@ -696,6 +713,35 @@ async function runSelfTest(){
   const fail=lines.filter(l=>l.indexOf('❌')===0).length;
   out.textContent=lines.concat(['', fail?('共 '+fail+' 项失败'):'全部通过']).join('\n');
 }
+/* ---- 探测结果回调 + 全局锁定 ---- */
+let __lockTimer=null;
+function lockUI(on,text){
+  const m=document.getElementById('lockMask'); if(!m) return;
+  if(on){ const t=document.getElementById('lockText'); if(text&&t) t.textContent=text; m.classList.add('show'); }
+  else { m.classList.remove('show'); clearTimeout(__lockTimer); __lockTimer=null; }
+}
+function lockUIFor(ms,text){
+  lockUI(true,text); clearTimeout(__lockTimer);
+  __lockTimer=setTimeout(()=>{ lockUI(false);
+    const h=document.getElementById('hint'); if(h) h.textContent='校准超时，已解锁'; }, ms);
+}
+function refreshLiveConn(){
+  const el=document.getElementById('setLiveConn'); if(!el) return;
+  let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+  el.textContent='当前连接：'+(conn?'已连接':'未连接');
+  el.style.color=conn?'#22c55e':'#ff5d5d';
+}
+window.onMqttProbeResult=function(ok,msg){
+  const out=document.getElementById('setTestOut'); if(!out) return;
+  out.textContent=(ok?'✅ ':'❌ ')+(msg||'');
+  out.className=ok?'ok':'bad';
+  refreshLiveConn();
+};
+window.onRtspProbeResult=function(ok,msg){
+  const out=document.getElementById('setRtspOut'); if(!out) return;
+  out.textContent=(ok?'✅ ':'❌ ')+(msg||'');
+  out.className=ok?'ok':'bad';
+};
 (function bindSettings(){
   const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); };
   on('btnSettings','click',openSettings);
@@ -705,10 +751,24 @@ async function runSelfTest(){
   on('setResetRef','click',resetRefPoint);
   on('setSelfTest','click',runSelfTest);
   on('setTestBroker','click',()=>{
-    let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+    const el=document.getElementById('setBroker');
+    const val=(el?el.value:'').trim();
     const out=document.getElementById('setTestOut');
-    out.textContent=conn?'已连接':'未连接'; out.className=conn?'ok':'bad';
+    if(!window.G20||!window.G20.mqttProbe){ out.className='bad'; out.textContent='当前包不支持测试'; return; }
+    if(!val){ out.className='bad'; out.textContent='请先填写 broker'; return; }
+    out.className=''; out.textContent='测试中…';
+    window.G20.mqttProbe(val);
   });
+  on('setTestRtsp','click',()=>{
+    const el=document.getElementById('setRtsp');
+    const val=(el?el.value:'').trim();
+    const out=document.getElementById('setRtspOut');
+    if(!window.G20||!window.G20.rtspProbe){ out.className='bad'; out.textContent='当前包不支持测试'; return; }
+    if(!val){ out.className='bad'; out.textContent='请先填写地址'; return; }
+    out.className=''; out.textContent='测试中…';
+    window.G20.rtspProbe(val);
+  });
+  refreshLiveConn();
 })();
 loadSettings();
 applyConfig();

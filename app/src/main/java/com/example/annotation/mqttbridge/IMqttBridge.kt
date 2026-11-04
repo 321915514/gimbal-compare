@@ -12,4 +12,6 @@ interface IMqttBridge {
     fun stop()
     /** 当前是否已连上 broker（供设置页自测/状态显示用） */
     fun isConnected(): Boolean
+    /** 用给定 broker 候选串做一次真实连接探测，返回 "OK:<url>" 或 "FAIL:<原因>"（不改变已生效连接） */
+    fun probe(brokerCsv: String): String
 }

@@ -44,6 +44,26 @@ class MqttManager : IMqttBridge {
 
     override fun isConnected(): Boolean = client?.isConnected == true
 
+    override fun probe(brokerCsv: String): String {
+        val urls = brokerCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (urls.isEmpty()) return "FAIL:未填写 broker"
+        var lastErr = ""
+        for (u in urls) {
+            try {
+                val c = MqttClient(u, "probe_" + System.nanoTime(), null)
+                c.connect(MqttConnectOptions().apply {
+                    isCleanSession = true
+                    connectionTimeout = 2
+                })
+                c.disconnect(); c.close()
+                return "OK:$u"
+            } catch (e: Exception) {
+                lastErr = e.message ?: e.toString()
+            }
+        }
+        return "FAIL:$lastErr"
+    }
+
     private fun connectLoop(myGen: Int) {
         while (running.get() && gen.get() == myGen) {
             for (b in brokers) {

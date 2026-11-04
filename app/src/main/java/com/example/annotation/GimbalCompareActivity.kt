@@ -52,6 +52,59 @@ class GimbalCompareActivity : Activity() {
 
         @JavascriptInterface
         fun mqttIsConnected(): Boolean = mqttBridge?.isConnected() == true
+
+        /** 探测输入框里填的 broker（可逗号多个），不影响当前连接 */
+        @JavascriptInterface
+        fun mqttProbe(broker: String) {
+            Thread {
+                var ok = false
+                var msg = ""
+                try {
+                    val b = mqttBridge ?: (
+                        Class.forName("com.example.annotation.mqtt.MqttManager")
+                            .getDeclaredConstructor().newInstance() as IMqttBridge)
+                    val res = b.probe(broker)
+                    ok = res.startsWith("OK:")
+                    msg = if (ok) "已连上 " + res.removePrefix("OK:")
+                          else "失败 " + res.removePrefix("FAIL:")
+                } catch (e: Exception) {
+                    msg = "MQTT 不可用：" + (e.message ?: "")
+                }
+                val f = ok
+                val fm = msg
+                webView.post {
+                    webView.evaluateJavascript(
+                        "window.onMqttProbeResult&&window.onMqttProbeResult($f,${jsStr(fm)})", null)
+                }
+            }.start()
+        }
+
+        /** 探测 RTSP 地址的 TCP 端口是否可连 */
+        @JavascriptInterface
+        fun rtspProbe(url: String) {
+            Thread {
+                var ok = false
+                var err = ""
+                try {
+                    val u = java.net.URI(url)
+                    val host = u.host ?: throw Exception("地址里没有主机名")
+                    val port = if (u.port > 0) u.port else 554
+                    java.net.Socket().use { s ->
+                        s.connect(java.net.InetSocketAddress(host, port), 3000)
+                        ok = true
+                    }
+                } catch (e: Exception) { err = e.message ?: "" }
+                val f = ok
+                val fe = err
+                webView.post {
+                    webView.evaluateJavascript(
+                        "window.onRtspProbeResult&&window.onRtspProbeResult($f,${jsStr(fe)})", null)
+                }
+            }.start()
+        }
+
+        private fun jsStr(s: String): String =
+            "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ") + "\""
     }
 
     @SuppressLint("SetJavaScriptEnabled")
