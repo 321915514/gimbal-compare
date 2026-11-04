@@ -439,20 +439,25 @@ window.onMqttMessage = function(topic, payload){
     }catch(e){}
     return;
   }
-  // 真值 dx/dy（gimbal/real_dxdy）
-  if(mcfg && mcfg.subscribe && topic === mcfg.subscribe){
-    let dx=null, dy=null;
-    try{
-      const o = JSON.parse(payload);
-      if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
-      else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
-    }catch(e){
-      const parts = payload.split(/[\s,]+/).map(Number);
-      if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
-    }
-    if(dx!=null && dy!=null){
-      setRealDxdy(dx, dy);
-      document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+  // 真值 dx/dy：支持逗号分隔的多个话题（gimbal/real_dxdy 或板端 aruco/detection）
+  {
+    const realTopics = String(mcfg && mcfg.subscribe || '').split(',').map(s=>s.trim()).filter(Boolean);
+    if(realTopics.indexOf(topic) >= 0){
+      let dx=null, dy=null, skipped=false;
+      try{
+        const o = JSON.parse(payload);
+        if(o.valid === 0 || o.valid === false) skipped = true;   // aruco/detection 无效帧
+        if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
+        else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
+      }catch(e){
+        const parts = payload.split(/[\s,]+/).map(Number);
+        if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
+      }
+      if(!skipped && dx!=null && dy!=null){
+        setRealDxdy(dx, dy);
+        document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+      }
+      return;
     }
   }
 };

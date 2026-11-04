@@ -19,7 +19,7 @@ window.GIMBAL_CONFIG = {
     enabled: true,
     broker: "tcp://192.168.3.78:1883,tcp://192.168.2.82:1883",  // 候选列表，连上哪个用哪个
     clientId: "g20",
-    subscribe: "gimbal/real_dxdy",          // 真值（订阅=收）
+    subscribe: "gimbal/real_dxdy,aruco/detection",   // 真值（订阅=收，两者都认）
     publish: "gimbal/result",               // dx/dy 结果（发布=发）
     calibCmd: "aruco/stop",                 // 校准命令（发布=发，点「校准」发 {"cmd":"calibrate"}）
     calibStatus: "aruco/calibrate/status",  // 校准状态（订阅=收，收 {"status":0/1/2} 显示）
