@@ -39,7 +39,7 @@ button.act.primary{background:linear-gradient(135deg,var(--accent),var(--accent2
 button.act.primary:hover{filter:brightness(1.1)}
 button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden}
-.main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none}
+.main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none;margin-bottom:6px}
 .main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
 .side{width:235px;min-width:0;overflow:hidden;padding:11px 11px 4px;background:var(--bg2);touch-action:none}
 .side .panel{margin:0;height:100%;display:flex;flex-direction:column}
@@ -56,7 +56,7 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .hintbar.show{opacity:1}
 .panel{margin:11px 18px 0;padding:8px 12px;border-radius:14px;background:var(--panel);
   border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.25);flex:none}
-.panel h3{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:1px;
+.panel h3{margin:0 0 4px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px;
   text-transform:uppercase;display:flex;align-items:center;gap:7px}
 .panel h3::before{content:'';width:3px;height:13px;border-radius:2px;
   background:linear-gradient(180deg,var(--accent),var(--accent2))}
@@ -69,14 +69,14 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 textarea{width:100%;height:48px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);padding:9px 11px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical}
 textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
-.cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;flex:1 1 auto;min-height:0}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;flex:0 0 auto}
 .cmp .cell{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:5px 10px;text-align:left;
   display:flex;flex-direction:column;justify-content:center;
   transition:.15s}
 .cmp .cell.real{border-color:rgba(92,179,255,.4);background:rgba(92,179,255,.06)}
 .cmp .cell.delta-ok{border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.08)}
 .cmp .cell.delta-bad{border-color:rgba(255,93,93,.5);background:rgba(255,93,93,.1)}
-.cmp .lbl{font-size:11px;color:var(--muted)}
+.cmp .lbl{font-size:10px;color:var(--muted)}
 .cmp .val{font-size:13px;font-weight:700;font-family:Consolas,monospace;margin-top:1px;letter-spacing:-.5px}
 .cmp .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
 .cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
@@ -119,15 +119,15 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 @keyframes spin{to{transform:rotate(360deg)}}
 .main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
-.dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(3,34px);
-  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:6px}
-.dpad .nav{height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
-  color:var(--fg);font-size:16px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
+.dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:auto}
+.dpad .nav{height:46px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);font-size:20px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dpad .nav:active{transform:scale(.88);background:var(--panel)}
 #mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
 .sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-.sizepad .nav{height:36px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+.sizepad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .sizepad .nav:active{transform:scale(.94);background:var(--panel)}
@@ -169,7 +169,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     </div>
     <div class="side">
   <div class="panel">
-    <h3>计算结果 · 中心为四孔对角线交点</h3>
+    <h3>计算结果 · 四孔中心</h3>
     <div class="cmp">
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
