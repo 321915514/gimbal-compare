@@ -10,9 +10,9 @@ window.GIMBAL_CONFIG = {
   frameUrl: "http://127.0.0.1:8899/frame.jpg",
 
   // 简化算法：参考点 + 比例（不用 H 矩阵）
-  gimbalRefX: 640,   // 吊舱参考中心 X（现场校准后自动记，这里只是初值）
-  gimbalRefY: 360,   // 吊舱参考中心 Y
-  scale: 0.68,       // mm/px（现场标定：Z / f_吊舱）
+  gimbalRefX: 651,   // 吊舱参考中心 X（现场校准后自动记，这里只是初值）
+  gimbalRefY: 358,   // 吊舱参考中心 Y
+  scale: 1.19,       // mm/px（现场标定：Z / f_吊舱）
 
   // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效）
   mqtt: {

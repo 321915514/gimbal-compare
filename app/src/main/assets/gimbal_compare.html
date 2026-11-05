@@ -239,7 +239,8 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="tr"><button class="bt" id="setTestRtsp">测试 RTSP</button><span id="setRtspOut">—</span></div>
 
       <div class="sec">标定</div>
-      <label class="row">scale（mm/px）<input id="setScale" type="number" step="0.001" /></label>
+      <label class="row">scale（mm/px，吊舱）<input id="setScale" type="number" step="0.001" /></label>
+      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.680</b> mm/px（= z/fx，按 z≈736mm、fx≈1081.76 计算，随深度变）</span></div>
       <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
 
       <details>
@@ -359,7 +360,7 @@ function autoDetect(){
 /* ============ 预置常量（部署时替换） ============ */
 const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
 let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
-let REF_X = 640, REF_Y = 360, SCALE = 0.68, calibrated = false, calibState = 0;
+let REF_X = 651, REF_Y = 358, SCALE = 1.19, calibrated = false, calibState = 0;
 
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
