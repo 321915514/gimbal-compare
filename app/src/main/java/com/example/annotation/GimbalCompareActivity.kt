@@ -4,6 +4,7 @@ package com.example.annotation
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -153,7 +154,11 @@ class GimbalCompareActivity : Activity() {
                     runOnUiThread {
                         // 收到人工标注请求：App 在后台时拉到前台，页面再切标注模式
                         if (topic == "aruco/manual/request") {
-                            try { this@GimbalCompareActivity.moveTaskToFront(true) } catch (_: Exception) {}
+                            try {
+                                val i = Intent(this@GimbalCompareActivity, GimbalCompareActivity::class.java)
+                                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                this@GimbalCompareActivity.startActivity(i)
+                            } catch (_: Exception) {}
                         }
                         val t = JSONObject.quote(topic)
                         val pl = JSONObject.quote(payload)
