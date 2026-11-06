@@ -33,13 +33,15 @@ window.GIMBAL_CONFIG = {
   // MQTT 通信（需 APK 用 ENABLE_MQTT=true 编译才生效）
   mqtt: {
     enabled: true,
-    broker: "tcp://192.168.3.78:1883,tcp://192.168.2.82:1883",  // 候选列表，连上哪个用哪个
+    broker: "tcp://192.168.144.118:1883,tcp://192.168.0.199:1883",  // 板子 EMQX（有线 eth0 优先 / WiFi wlan0 兜底）
     clientId: "g20",
-    subscribe: "gimbal/real_dxdy,aruco/detection",   // 真值（订阅=收，两者都认）
+    subscribe: "gimbal/real_dxdy,aruco/detection,aruco/manual/request",   // 真值 + 检测结果 + 人工标注请求
     publish: "gimbal/result",               // dx/dy 结果（发布=发）
     calibCmd: "aruco/stop",                 // 校准命令（发布=发，点「校准」发 {"cmd":"calibrate"}）
     calibStatus: "aruco/calibrate/status",  // 校准状态（订阅=收，收 {"status":0/1/2} 显示）
     stereoGrab: "stereo/grab",              // 请求双目图（发布=发 {"cmd":"grab"}）
-    stereoImage: "stereo/image"             // 双目图返回（订阅=收 {"img":"base64"}）
+    stereoImage: "stereo/image",            // 双目图返回（订阅=收 {"img":"base64"}）
+    manualReq: "aruco/manual/request",      // 人工标注请求（订阅=收：自动校准失败，板端请求人工标注）
+    manualResp: "aruco/manual"              // 人工标注回传（发布=发 {"image_id":..,"points":[{x,y,r}..]}）
   }
 };

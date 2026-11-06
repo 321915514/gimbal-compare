@@ -151,6 +151,10 @@ class GimbalCompareActivity : Activity() {
             bridge.start(broker, clientId, subscribe, object : IMqttListener {
                 override fun onMessage(topic: String, payload: String) {
                     runOnUiThread {
+                        // 收到人工标注请求：App 在后台时拉到前台，页面再切标注模式
+                        if (topic == "aruco/manual/request") {
+                            try { this@GimbalCompareActivity.moveTaskToFront(true) } catch (_: Exception) {}
+                        }
                         val t = JSONObject.quote(topic)
                         val pl = JSONObject.quote(payload)
                         webView.evaluateJavascript("window.onMqttMessage && window.onMqttMessage($t,$pl)", null)

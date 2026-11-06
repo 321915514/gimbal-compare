@@ -383,6 +383,7 @@ let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
 let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
 let ST_REF_X = 784.4, ST_REF_Y = 559.1, ST_SCALE = 0.830, stCalibrated = false;            // 双目 1536×1280 SD(0.7,0.5)px
 let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
+let manualPending = null;   // 板端发来的人工标注请求(aruco/manual/request)，非空=处于人工补标模式
 
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -556,6 +557,22 @@ window.onMqttMessage = function(topic, payload){
     }catch(e){}
     return;
   }
+  // 人工标注请求（自动校准失败，板端请求人工标注；用户自己「获取双目」抓帧来标）
+  if(mcfg && mcfg.manualReq && topic === mcfg.manualReq){
+    try{
+      const o = JSON.parse(payload);
+      manualPending = o;
+      marks=[]; selected=-1; inlierIdx=[]; lastDx=lastDy=null;
+      frameSrc = 'stereo';
+      document.getElementById('hint').textContent='自动校准失败('+(o.reason||'')+')：点「获取双目」抓帧，标满 4 孔后点「回传标注」';
+      setStat('自动校准失败，待人工标注','warn');
+      const btn=document.getElementById('calibrate');
+      if(btn){btn.textContent='📤 回传标注';btn.disabled=false;}
+      calibState=0;
+      draw();
+    }catch(e){}
+    return;
+  }
   // 真值 dx/dy：支持逗号分隔的多个话题（gimbal/real_dxdy 或板端 aruco/detection）
   {
     const realTopics = String(mcfg && mcfg.subscribe || '').split(',').map(s=>s.trim()).filter(Boolean);
@@ -593,6 +610,31 @@ function updateCalibButton(state){
 /* 校准：记下当前四孔中心为参考点 + 发布 cmd=calibrate 到 aruco/stop 给板端 */
 function calibrate(){
   if(calibState === 1){ document.getElementById('hint').textContent='校准中，请稍候'; return; }
+  // 人工补标模式：回传标注点（aruco/manual），不是发自动校准命令（aruco/stop）
+  if(manualPending){
+    if(inlierIdx.length < 4){
+      document.getElementById('hint').textContent='未标满 4 个孔，无法回传';
+      return;
+    }
+    // 坐标还原：双目帧被降采样到 1280 宽显示，板端要 1536×1280 原图坐标
+    const OW = 1536, OH = 1280;
+    const sx = img.width>0 ? OW/img.width : 1;
+    const sy = img.height>0 ? OH/img.height : 1;
+    const points = inlierIdx.map(i=>({
+      x: Math.round(marks[i].cx*sx*10)/10,
+      y: Math.round(marks[i].cy*sy*10)/10,
+      r: Math.round((marks[i].r||0)*sx)
+    }));
+    const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+    if(mcfg && mcfg.manualResp) mqttPublish(mcfg.manualResp, JSON.stringify({image_id: manualPending.image_id||'', points: points}));
+    document.getElementById('hint').textContent='已回传人工标注（'+points.length+' 孔）';
+    setStat('已回传人工标注','ok');
+    manualPending = null;
+    const btn=document.getElementById('calibrate');
+    if(btn){btn.textContent='🎯 校准';}
+    recompute();
+    return;
+  }
   if(inlierIdx.length < 4){
     document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
     return;
