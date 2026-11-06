@@ -205,6 +205,12 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
       <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px" id="curCam">当前帧：吊舱 1280×720</div>
+    <div class="cmp" style="margin-top:6px">
+      <div class="cell"><div class="lbl">双目 dx</div><div class="val" id="vsdx">—<small>mm</small></div></div>
+      <div class="cell"><div class="lbl">双目 dy</div><div class="val" id="vsdy">—<small>mm</small></div></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">双目板心预测 <b id="vscenter">—</b>（mm 与吊舱 1:1 相等；此像素按双目常量反算，供到双目画面里核对）</div>
     <div class="dpad">
       <button class="nav" id="mvUp">↑</button>
       <button class="nav" id="mvLeft">←</button>
@@ -240,8 +246,10 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 
       <div class="sec">标定</div>
       <label class="row">scale（mm/px，吊舱）<input id="setScale" type="number" step="0.001" /></label>
-      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.680</b> mm/px（= z/fx，按 z≈736mm、fx≈1081.76 计算，随深度变）</span></div>
+      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.830</b> mm/px（1536×1280；零位同帧标定 2026-11-06：深度图 900.7mm÷fx1081.76=0.8326 与板尺互验 0.8235，差 1.1%。旧 0.680 作废）</span></div>
       <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
+      <div class="tr"><span id="stRef">—</span></div>
+      <div class="tr" style="font-size:11px;color:var(--muted);line-height:1.6">换算依据：吊舱与双目在零位同帧实测，<b>毫米层面 1:1 相等</b>（归零后双目 0.0±0.6mm、吊舱 0.0±1.9mm）⇒ 吊舱的 dx/dy 就是双目的 dx/dy。双目 scale 只用来反推「板心应出现在双目画面哪个像素」便于比对。两套常量各按各的帧分辨率标定，<b>不可共用</b>；点「校准」在现场零位重采会覆盖当前帧来源那套的默认值。</div>
 
       <details>
         <summary>高级：MQTT 话题与客户端（一般不用改）</summary>
@@ -360,7 +368,11 @@ function autoDetect(){
 /* ============ 预置常量（部署时替换） ============ */
 const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
 let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
-let REF_X = 653, REF_Y = 358, SCALE = 1.19, calibrated = false, calibState = 0;
+// 零位同帧标定 2026-11-06（板上连抓 8 组、5 组两路全检出，均值±SD）
+// 吊舱与双目各一套常量，基准点/scale 都按各自帧分辨率标定，绝不能共用
+let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
+let ST_REF_X = 784.4, ST_REF_Y = 559.1, ST_SCALE = 0.830, stCalibrated = false;            // 双目 1536×1280 SD(0.7,0.5)px
+let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
 
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
@@ -386,7 +398,13 @@ function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.he
 }
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
-img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');document.getElementById('hint').textContent='已取帧，点「检测圆」或手动点孔标注';recompute()};
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');
+  const nm=frameSrc==='stereo'?'双目':'吊舱', want=frameSrc==='stereo'?[1536,1280]:[1280,720];
+  const cc=$('curCam'); if(cc) cc.textContent='当前帧：'+nm+' 标定口径 '+want[0]+'×'+want[1]+'，实际 '+img.width+'×'+img.height;
+  let h='已取帧（'+nm+'），点「检测圆」或手动点孔标注；dx/dy 用'+nm+'那套常量，两路 mm 1:1';
+  if(img.width!==want[0]||img.height!==want[1]) h+=' ⚠️ 帧尺寸与常量口径不符，scale/参考点需按 '+img.width+'×'+img.height+' 重标';
+  document.getElementById('hint').textContent=h;
+  recompute()};
 img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
 new ResizeObserver(fit).observe(box);
 cv.addEventListener('pointerdown',e=>{
@@ -417,6 +435,7 @@ holdRepeat(document.getElementById('enlarge'),()=>resize(4));
 
 /* ================= 获取帧（直接拉 URL，不选文件） ================= */
 function fetchFrame(){
+  frameSrc='pod';
   // App 内：原生 libVLC 抓 RTSP 帧
   if(DEFAULT_RTSP && window.G20 && window.G20.grabFrame){
     spinner(true);setStat('取帧中…','busy');
@@ -446,19 +465,25 @@ document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recomp
 
 /* ================= 结果计算 ================= */
 const $=id=>document.getElementById(id);
-function fmt(v,d){return isNaN(v)?'—':v.toFixed(d)}
+function fmt(v,d){if(isNaN(v))return '—';const z=Math.pow(10,-d)/2;return (Math.abs(v)<z?0:v).toFixed(d)}   // 避免出现 "-0mm"
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+    $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';$('vscenter').textContent='—';
     inlierIdx=[];lastDx=lastDy=null;draw();return}
   const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
   const r=robustCentroid(mp);
   if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
   inlierIdx=r.inliers;
-  const dx=(REF_X-r.cx)*SCALE, dy=(REF_Y-r.cy)*SCALE;   // 简化：参考点 + 比例
+  // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
+  const RX = frameSrc==='stereo'?ST_REF_X:REF_X, RY = frameSrc==='stereo'?ST_REF_Y:REF_Y,
+        SC = frameSrc==='stereo'?ST_SCALE:SCALE;
+  const dx=(RX-r.cx)*SC, dy=(RY-r.cy)*SC;   // 简化：参考点 + 比例
   lastDx=dx; lastDy=dy;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
+  $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
+  $('vscenter').textContent='('+(ST_REF_X-dx/ST_SCALE).toFixed(1)+', '+(ST_REF_Y-dy/ST_SCALE).toFixed(1)+') px';
   // 已校准后自动发布 dx/dy（发送 MQTT 保留）
   if(calibrated){
     const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
@@ -496,6 +521,7 @@ window.onMqttMessage = function(topic, payload){
       const img = o.img || o.image || o.data;
       if(img){
         const url = img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img;
+        frameSrc = 'stereo';
         loadCompareFrame(url);
       } else {
         spinner(false); setStat('取双目失败','');
@@ -568,9 +594,16 @@ function calibrate(){
   const pts = inlierIdx.map(i=>marks[i]);
   const cx = pts.reduce((s,m)=>s+m.cx,0)/4;
   const cy = pts.reduce((s,m)=>s+m.cy,0)/4;
-  REF_X = cx; REF_Y = cy;
-  calibrated = true;
-  try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){}
+  // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存
+  if(frameSrc==='stereo'){ ST_REF_X=cx; ST_REF_Y=cy; stCalibrated=true;
+    try{ localStorage.setItem('stereo_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
+  else { REF_X=cx; REF_Y=cy; calibrated=true;
+    try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
+  if(frameSrc==='stereo'){
+    // 双目基准是 App 本地量，不通知板端、不锁 UI（板端 calibrate 会动平台，危险）
+    document.getElementById('hint').textContent='双目基准已就地保存 ('+cx.toFixed(1)+','+cy.toFixed(1)+') px —— 本地生效，未通知板端';
+    recompute(); return;
+  }
   // 发送校准命令给板端（发布到 aruco/stop）
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
   if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
@@ -588,10 +621,15 @@ function applyConfig(){
   if(CFG.gimbalRefX!=null)REF_X=CFG.gimbalRefX;
   if(CFG.gimbalRefY!=null)REF_Y=CFG.gimbalRefY;
   if(CFG.scale!=null)SCALE=CFG.scale;
-  // 恢复已保存的校准参考点
+  if(CFG.stereoRefX!=null)ST_REF_X=CFG.stereoRefX;
+  if(CFG.stereoRefY!=null)ST_REF_Y=CFG.stereoRefY;
+  if(CFG.stereoScale!=null)ST_SCALE=CFG.stereoScale;
+  // 恢复已保存的校准参考点（吊舱 / 双目 分开）
   try{
     const s=localStorage.getItem('gimbal_ref');
     if(s){const o=JSON.parse(s);if(o.x!=null&&o.y!=null){REF_X=o.x;REF_Y=o.y;calibrated=true;}}
+    const t=localStorage.getItem('stereo_ref');
+    if(t){const o=JSON.parse(t);if(o.x!=null&&o.y!=null){ST_REF_X=o.x;ST_REF_Y=o.y;stCalibrated=true;}}
   }catch(e){}
   recompute();
 }
@@ -646,7 +684,11 @@ function openSettings(){
   SET_FIELDS.forEach(([id,p])=>{ const el=document.getElementById(id); if(el) el.value=(cfgGet(p)!=null?cfgGet(p):''); });
   const on=document.getElementById('setMqttOn'); if(on) on.checked=!!cfgGet('mqtt.enabled');
   const ref=document.getElementById('setRef');
-  if(ref) ref.textContent='参考点 X='+Number(REF_X).toFixed(1)+'  Y='+Number(REF_Y).toFixed(1)+(calibrated?'（已校准）':'（默认）');
+  if(ref) ref.textContent='吊舱参考点 ('+Number(REF_X).toFixed(1)+', '+Number(REF_Y).toFixed(1)+')'+(calibrated?'（已校准）':'（默认）')+' · scale '+Number(SCALE).toFixed(3)+' mm/px';
+  const sr=document.getElementById('stRef');
+  if(sr) sr.textContent='双目参考点 ('+Number(ST_REF_X).toFixed(1)+', '+Number(ST_REF_Y).toFixed(1)+')'+(stCalibrated?'（已校准）':'（默认）')+' · scale '+Number(ST_SCALE).toFixed(3)+' mm/px';
+  const ps=document.getElementById('podScaleVal'); if(ps) ps.textContent=Number(SCALE).toFixed(3);
+  const sv=document.getElementById('stereoScaleVal'); if(sv) sv.textContent=Number(ST_SCALE).toFixed(3);
   try{ refreshLiveConn(); }catch(e){}
   document.getElementById('settingsMask').classList.add('show');
 }
@@ -665,13 +707,14 @@ function resetSettings(){
   location.reload();
 }
 function resetRefPoint(){
-  try{ localStorage.removeItem('gimbal_ref'); }catch(e){}
-  calibrated=false;
-  REF_X=(window.GIMBAL_CONFIG||{}).gimbalRefX||REF_X;
-  REF_Y=(window.GIMBAL_CONFIG||{}).gimbalRefY||REF_Y;
-  recompute();
-  const ref=document.getElementById('setRef');
-  if(ref) ref.textContent='参考点 X='+Number(REF_X).toFixed(1)+'  Y='+Number(REF_Y).toFixed(1)+'（默认）';
+  try{ localStorage.removeItem('gimbal_ref'); localStorage.removeItem('stereo_ref'); }catch(e){}
+  calibrated=false; stCalibrated=false;
+  const CFG=(window.GIMBAL_CONFIG||{});
+  if(CFG.gimbalRefX!=null)REF_X=CFG.gimbalRefX;
+  if(CFG.gimbalRefY!=null)REF_Y=CFG.gimbalRefY;
+  if(CFG.stereoRefX!=null)ST_REF_X=CFG.stereoRefX;
+  if(CFG.stereoRefY!=null)ST_REF_Y=CFG.stereoRefY;
+  recompute(); openSettings();
 }
 async function runSelfTest(){
   const out=document.getElementById('stOut'); const lines=[];
@@ -685,6 +728,12 @@ async function runSelfTest(){
   add('配置·broker 格式', (list.length>0&&bad.length===0), bad.length?('非法 '+bad.join(' ')):(list.length+' 个候选'));
   const sc=Number(cfgGet('scale'));
   add('配置·scale', sc>0.01&&sc<10, sc+' mm/px');
+  // 双相机常量 + mm 1:1 换算自检
+  const ssc=Number(cfgGet('stereoScale')), srx=Number(cfgGet('stereoRefX')), sry=Number(cfgGet('stereoRefY'));
+  add('双相机常量齐备', (sc>0.01&&sc<10&&ssc>0.01&&ssc<10&&srx>0&&sry>0),
+      '吊舱 ('+REF_X.toFixed(1)+','+REF_Y.toFixed(1)+')/'+sc+' · 双目 ('+srx+','+sry+')/'+ssc);
+  const tpx=Math.round(100/ssc);
+  add('换算·100mm→双目像素', tpx>40&&tpx<400, '±100mm ↔ ±'+tpx+'px（两路 mm 1:1，双目按 k_st='+ssc+' 折像素）');
   const rtsp=String(cfgGet('rtspUrl')||'');
   add('配置·RTSP 地址', /^rtsp:\/\//.test(rtsp), rtsp||'(空)');
   let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
