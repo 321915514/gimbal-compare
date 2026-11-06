@@ -41,8 +41,8 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden}
 .main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none;margin-bottom:6px}
 .main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
-.side{width:235px;min-width:0;overflow:hidden;padding:11px 11px 4px;background:var(--bg2);touch-action:none}
-.side .panel{margin:0;height:100%;display:flex;flex-direction:column}
+.side{width:235px;min-width:0;overflow:hidden;padding:11px 11px 2px;background:var(--bg2);touch-action:none}
+.side .panel{margin:0;height:100%;min-height:0;display:flex;flex-direction:column;padding:6px 12px}
 .side details{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
 .side details summary{padding:10px 13px;cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600;
   list-style:none;user-select:none}
@@ -80,6 +80,17 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .cmp .val{font-size:13px;font-weight:700;font-family:Consolas,monospace;margin-top:1px;letter-spacing:-.5px}
 .cmp .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
 .cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
+/* 吊舱与双目 dx/dy 并成一行 4 格；结果区可收缩，方向键/缩放键钉在底部永不被挤 */
+.cmp.one{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
+.cmp.one .cell{padding:3px 6px;border-radius:8px}
+.cmp.one .lbl{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp.one .val{font-size:12.5px;margin-top:0;letter-spacing:-.3px;white-space:nowrap}
+.cmp.one .val small{display:none}
+.res{flex:0 1 auto;min-height:0;overflow:hidden}
+.res .note{display:flex;gap:6px;justify-content:space-between;font-size:9.5px;color:var(--muted);
+  margin-top:3px;white-space:nowrap;overflow:hidden}
+.res .note>span{overflow:hidden;text-overflow:ellipsis}
+.side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
 .verdict{margin-top:11px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:600;
   display:none;align-items:center;gap:8px;line-height:1.5}
 .verdict.show{display:flex}
@@ -200,17 +211,16 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     </div>
     <div class="side">
   <div class="panel">
-    <h3>计算结果 · 四孔中心</h3>
-    <div class="cmp">
-      <div class="cell"><div class="lbl">dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
-      <div class="cell"><div class="lbl">dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
+    <h3>计算结果 · 四孔中心（mm）</h3>
+    <div class="res">
+      <div class="cmp one">
+        <div class="cell"><div class="lbl">吊舱dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
+        <div class="cell"><div class="lbl">吊舱dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">双目dx</div><div class="val real" id="vsdx">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">双目dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
+      </div>
+      <div class="note"><span id="curCam">当前帧：吊舱 1280×720</span><span>板心 <b id="vscenter">—</b></span></div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px" id="curCam">当前帧：吊舱 1280×720</div>
-    <div class="cmp" style="margin-top:6px">
-      <div class="cell"><div class="lbl">双目 dx</div><div class="val" id="vsdx">—<small>mm</small></div></div>
-      <div class="cell"><div class="lbl">双目 dy</div><div class="val" id="vsdy">—<small>mm</small></div></div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px">双目板心预测 <b id="vscenter">—</b>（mm 与吊舱 1:1 相等；此像素按双目常量反算，供到双目画面里核对）</div>
     <div class="dpad">
       <button class="nav" id="mvUp">↑</button>
       <button class="nav" id="mvLeft">←</button>
