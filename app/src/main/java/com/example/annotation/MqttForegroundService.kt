@@ -6,6 +6,7 @@ package com.example.annotation
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -91,14 +92,30 @@ class MqttForegroundService : Service() {
     }
 
     private fun wakeApp(payload: String) {
-        try {
-            val i = Intent(this, GimbalCompareActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                putExtra("manual_request", payload)
-            }
-            startActivity(i)
-        } catch (_: Exception) {}
+        val i = Intent(this, GimbalCompareActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("manual_request", payload)
+        }
+        // 前台时直接拉起（快）；后台/未开时靠 full-screen intent 通知绕过 Android 12+ 后台启动限制
+        try { startActivity(i) } catch (_: Exception) {}
+        val pi = PendingIntent.getActivity(this, 1, i,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val ch = "gimbal_wake_alert"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nc = NotificationChannel(ch, "标注提醒", NotificationManager.IMPORTANCE_HIGH)
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(nc)
+        }
+        @Suppress("DEPRECATION")
+        val b = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            Notification.Builder(this, ch) else Notification.Builder(this)
+        val notif = b.setContentTitle("需要人工标注")
+            .setContentText("自动校准失败，请在画面标 4 个孔")
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setFullScreenIntent(pi, true)
+            .setAutoCancel(true)
+            .build()
+        try { getSystemService(NotificationManager::class.java)?.notify(100, notif) } catch (_: Exception) {}
     }
 
     private fun sleepQuiet(ms: Long) { try { Thread.sleep(ms) } catch (_: InterruptedException) {} }
