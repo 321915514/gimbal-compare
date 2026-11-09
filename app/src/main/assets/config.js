@@ -35,7 +35,7 @@ window.GIMBAL_CONFIG = {
     enabled: true,
     broker: "tcp://192.168.144.118:1883,tcp://192.168.0.199:1883",  // 板子 EMQX（有线 eth0 优先 / WiFi wlan0 兜底）
     clientId: "g20",
-    subscribe: "gimbal/real_dxdy,aruco/detection,aruco/manual/request",   // 真值 + 检测结果 + 人工标注请求
+    subscribe: "gimbal/real_dxdy,aruco/detection",   // 真值+检测结果（aruco/manual/request 由常驻服务订阅，见 MqttForegroundService）
     publish: "gimbal/result",               // dx/dy 结果（发布=发）
     calibCmd: "aruco/stop",                 // 校准命令（发布=发，点「校准」发 {"cmd":"calibrate"}）
     calibStatus: "aruco/calibrate/status",  // 校准状态（订阅=收，收 {"status":0/1/2} 显示）

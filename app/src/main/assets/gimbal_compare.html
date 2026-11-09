@@ -385,6 +385,30 @@ let ST_REF_X = 784.4, ST_REF_Y = 559.1, ST_SCALE = 0.830, stCalibrated = false; 
 let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
 let manualPending = null;   // 板端发来的人工标注请求(aruco/manual/request)，非空=处于人工补标模式
 
+// 进入人工补标模式（MQTT 直推 或 冷启动/热拉起自取，都走这里）
+function enterManualMode(o){
+  manualPending = o || {};
+  marks=[]; selected=-1; inlierIdx=[]; lastDx=lastDy=null;
+  frameSrc = 'stereo';
+  try{
+    document.getElementById('hint').textContent='自动校准失败('+((o&&o.reason)||'')+')：点「获取双目」抓帧，标满 4 孔后点「回传标注」';
+    setStat('自动校准失败，待人工标注','warn');
+    const btn=document.getElementById('calibrate');
+    if(btn){btn.textContent='📤 回传标注';btn.disabled=false;}
+  }catch(e){}
+  calibState=0;
+  draw();
+}
+// 从原生取走冷启动/热拉起时服务暂存的标注请求
+window.__takeManual=function(){
+  try{
+    if(window.G20 && G20.takePendingManualRequest){
+      const p=G20.takePendingManualRequest();
+      if(p) enterManualMode(JSON.parse(p));
+    }
+  }catch(e){}
+};
+
 /* ================= 画布标注 ================= */
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const box=document.getElementById('mainBox');
@@ -559,18 +583,7 @@ window.onMqttMessage = function(topic, payload){
   }
   // 人工标注请求（自动校准失败，板端请求人工标注；用户自己「获取双目」抓帧来标）
   if(mcfg && mcfg.manualReq && topic === mcfg.manualReq){
-    try{
-      const o = JSON.parse(payload);
-      manualPending = o;
-      marks=[]; selected=-1; inlierIdx=[]; lastDx=lastDy=null;
-      frameSrc = 'stereo';
-      document.getElementById('hint').textContent='自动校准失败('+(o.reason||'')+')：点「获取双目」抓帧，标满 4 孔后点「回传标注」';
-      setStat('自动校准失败，待人工标注','warn');
-      const btn=document.getElementById('calibrate');
-      if(btn){btn.textContent='📤 回传标注';btn.disabled=false;}
-      calibState=0;
-      draw();
-    }catch(e){}
+    try{ enterManualMode(JSON.parse(payload)); }catch(e){}
     return;
   }
   // 真值 dx/dy：支持逗号分隔的多个话题（gimbal/real_dxdy 或板端 aruco/detection）
@@ -684,6 +697,7 @@ function applyConfig(){
     if(t){const o=JSON.parse(t);if(o.x!=null&&o.y!=null){ST_REF_X=o.x;ST_REF_Y=o.y;stCalibrated=true;}}
   }catch(e){}
   recompute();
+  try{ window.__takeManual && window.__takeManual(); }catch(e){}   // 冷启动：取走服务暂存的标注请求
 }
 /* 现场免重打包：HBuilder 运行时读 /sdcard/gimbal_config.json 覆盖内置配置 */
 function loadExternalConfig(){

@@ -4,6 +4,7 @@ package com.example.annotation
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -32,6 +33,7 @@ class GimbalCompareActivity : Activity() {
     private var libVLC: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var mqttBridge: IMqttBridge? = null
+    @Volatile private var pendingManualPayload: String? = null   // 冷启动/热拉起时服务传来的 manual/request
 
     // 抓帧分辨率：与 H 标定时吊舱帧分辨率一致（改这里）
     private val GRAB_W = 1280
@@ -53,6 +55,14 @@ class GimbalCompareActivity : Activity() {
 
         @JavascriptInterface
         fun mqttIsConnected(): Boolean = mqttBridge?.isConnected() == true
+
+        /** 冷启动/热拉起时取走待处理的人工标注请求(aruco/manual/request)，取一次即清空 */
+        @JavascriptInterface
+        fun takePendingManualRequest(): String {
+            val p = pendingManualPayload ?: ""
+            pendingManualPayload = null
+            return p
+        }
 
         /** 探测输入框里填的 broker（可逗号多个），不影响当前连接 */
         @JavascriptInterface
@@ -140,11 +150,50 @@ class GimbalCompareActivity : Activity() {
         val sdcardHtml = java.io.File("/sdcard/gimbal_compare.html")
         webView.loadUrl(if (sdcardHtml.exists()) "file:///sdcard/gimbal_compare.html"
                         else "file:///android_asset/gimbal_compare.html")
+
+        // 冷启动/热拉起：服务经 intent extra 传来的标注请求先暂存，页面就绪后自取
+        intent?.getStringExtra("manual_request")?.let { pendingManualPayload = it }
+        ensureNotifPermission()
+        ensureWakeService()
+    }
+
+    /** Android 13+ 通知权限（前台服务通知用，拒绝也不影响服务运行） */
+    private fun ensureNotifPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            try { requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1) } catch (_: Exception) {}
+        }
+    }
+
+    /** 启动常驻唤醒服务（ENABLE_MQTT=false 时反射失败即空转，不崩） */
+    private fun ensureWakeService() {
+        try {
+            val i = Intent(this, MqttForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i)
+            else startService(i)
+        } catch (_: Exception) {}
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra("manual_request")?.let {
+            pendingManualPayload = it
+            webView.post {
+                webView.evaluateJavascript("window.__takeManual&&window.__takeManual()", null)
+            }
+        }
     }
 
     /** 反射加载 MqttManager（仅 ENABLE_MQTT=true 编译时存在），App 侧不硬依赖 Paho */
     private fun startMqtt(broker: String, clientId: String, subscribe: String) {
         if (!BuildConfig.ENABLE_MQTT) return
+        // 存 broker/clientId 供常驻唤醒服务读取（冷启动订阅用；服务用 clientId+"_svc" 避免 client id 冲突）
+        try {
+            getSharedPreferences("gimbal_cfg", Context.MODE_PRIVATE).edit()
+                .putString("broker", broker).putString("clientId", clientId).apply()
+        } catch (_: Exception) {}
         try {
             val cls = Class.forName("com.example.annotation.mqtt.MqttManager")
             val bridge = cls.getDeclaredConstructor().newInstance() as IMqttBridge
@@ -152,14 +201,6 @@ class GimbalCompareActivity : Activity() {
             bridge.start(broker, clientId, subscribe, object : IMqttListener {
                 override fun onMessage(topic: String, payload: String) {
                     runOnUiThread {
-                        // 收到人工标注请求：App 在后台时拉到前台，页面再切标注模式
-                        if (topic == "aruco/manual/request") {
-                            try {
-                                val i = Intent(this@GimbalCompareActivity, GimbalCompareActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                                this@GimbalCompareActivity.startActivity(i)
-                            } catch (_: Exception) {}
-                        }
                         val t = JSONObject.quote(topic)
                         val pl = JSONObject.quote(payload)
                         webView.evaluateJavascript("window.onMqttMessage && window.onMqttMessage($t,$pl)", null)
@@ -169,6 +210,7 @@ class GimbalCompareActivity : Activity() {
         } catch (_: Exception) {
             // MQTT 未编译进 APK 或加载失败，静默
         }
+        ensureWakeService()   // 存好配置后再确保唤醒服务起来（服务会轮询 SharedPreferences 重连）
     }
 
     /** 连 RTSP → play → 等第一帧 → TextureView 抓 Bitmap → JPEG base64 → 推回页面 */
