@@ -259,7 +259,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.833</b> mm/px（1536×1280，零位_20261106_1203 八帧 z/fx 均值 0.8328；旧 0.830 与 0.680 作废）</span></div>
       <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
       <div class="tr"><span id="stRef">—</span></div>
-      <div class="tr" style="font-size:11px;color:var(--muted);line-height:1.6">换算依据：吊舱与双目在零位同帧实测，<b>毫米层面 1:1 相等</b>（归零后双目 0.0±0.6mm、吊舱 0.0±1.9mm）⇒ 吊舱的 dx/dy 就是双目的 dx/dy。双目 scale 只用来反推「板心应出现在双目画面哪个像素」便于比对。两套常量各按各的帧分辨率标定，<b>不可共用</b>；点「校准」在现场零位重采会覆盖当前帧来源那套的默认值。</div>
+      <div class="tr" style="font-size:11px;color:var(--muted);line-height:1.6">换算依据：纠偏 dx/dy <b>只用双目帧</b>（板端深度相机同一路），零位基准 (786.0, 560.0)、scale 0.8328。吊舱帧不出 mm —— 吊舱装在云台上，云台角度或变焦一变，它的参考点和 mm/px 同时失效（实测零位同帧：吊舱 −8/−8 vs 双目 20/−6，差 28mm），所以吊舱帧只保留看图/手动标注。要在吊舱上也算 mm，得先把云台锁到零位角度、变焦锁死，重跑零位同帧标定，再把代码里 <code>POD_MM</code> 改 true。</div>
 
       <details>
         <summary>高级：MQTT 话题与客户端（一般不用改）</summary>
@@ -401,6 +401,9 @@ let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
 let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
 let ST_REF_X = 786.0, ST_REF_Y = 560.0, ST_SCALE = 0.8328, stCalibrated = false;            // 双目 1536×1280 零位_20261106_1203 八帧对角线交点均值 SD(0.77,0.73)px
 let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
+const POD_MM = false;   // 吊舱帧是否计算 dx/dy(mm)：默认关。吊舱在云台上，角度一转/变焦一变，REF+SCALE 同时失效
+                        // （实测零位同帧吊舱 −8/−8 vs 双目 20/−6）。要恢复：把云台锁到零位角度、变焦锁死，
+                        // 重跑零位同帧标定后把这里改 true，并同时校准 REF_X/REF_Y。
 let manualPending = null;   // 板端发来的人工标注请求(aruco/manual/request)，非空=处于人工补标模式
 
 // 进入人工补标模式（MQTT 直推 或 冷启动/热拉起自取，都走这里）
@@ -453,8 +456,10 @@ function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
 img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');
   const nm=frameSrc==='stereo'?'双目':'吊舱', want=frameSrc==='stereo'?[1536,1280]:[1280,720];
-  const cc=$('curCam'); if(cc) cc.textContent='当前帧：'+nm+' 标定口径 '+want[0]+'×'+want[1]+'，实际 '+img.width+'×'+img.height;
-  let h='已取帧（'+nm+'），点「检测圆」或手动点孔标注；dx/dy 用'+nm+'那套常量，两路 mm 1:1';
+  const cc=$('curCam'); if(cc) cc.textContent='当前帧：'+nm+' 标定口径 '+want[0]+'×'+want[1]+'，实际 '+img.width+'×'+img.height+(frameSrc==='stereo'?'':'（吊舱帧不出 mm）');
+  let h = frameSrc==='stereo'
+    ? '已取帧（双目），点「检测圆」或手动点孔标注；dx/dy 按零位基准 (786.0, 560.0)、scale 0.8328 算'
+    : '已取帧（吊舱），只用于看图/标注；吊舱在云台上，角度或变焦一变 mm 就不准，纠偏值统一看双目帧';
   if(img.width!==want[0]||img.height!==want[1]) h+=' ⚠️ 帧尺寸与常量口径不符，scale/参考点需按 '+img.width+'×'+img.height+' 重标';
   document.getElementById('hint').textContent=h;
   recompute()};
@@ -533,6 +538,13 @@ function recompute(){
   const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
   const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
   const cxN = r.cx*kx, cyN = r.cy*ky;
+  $('vscenter').textContent='('+cxN.toFixed(1)+', '+cyN.toFixed(1)+') px';
+  // 吊舱帧默认不出 mm：吊舱装在云台上，角度/变焦一变 REF 和 SCALE 就同时失效（实测零位同帧 −8/−8 vs 双目 20/−6）
+  if(frameSrc!=='stereo' && !POD_MM){
+    $('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+    $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';
+    lastDx=lastDy=null; draw(); return;
+  }
   // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
   const RX = frameSrc==='stereo'?ST_REF_X:REF_X, RY = frameSrc==='stereo'?ST_REF_Y:REF_Y,
         SC = frameSrc==='stereo'?ST_SCALE:SCALE;
@@ -540,9 +552,8 @@ function recompute(){
   lastDx=dx; lastDy=dy;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
-  $('vscenter').textContent='('+cxN.toFixed(1)+', '+cyN.toFixed(1)+') px';
-  // 已校准后自动发布 dx/dy（发送 MQTT 保留）
-  if(calibrated){
+  // 已校准后自动发布 dx/dy（只在双目帧上发，吊舱帧的 mm 不可信，绝不发）
+  if(calibrated && frameSrc==='stereo'){
     const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
     if(mcfg && mcfg.enabled && mcfg.publish){
       try{ mqttPublish(mcfg.publish, JSON.stringify({dx:+dx.toFixed(2), dy:+dy.toFixed(2)})); }catch(e){}
@@ -670,11 +681,14 @@ function calibrate(){
     recompute();
     return;
   }
+  // 吊舱帧不出 mm(POD_MM=false)：不改吊舱基准（写了也没 mm 用它），但仍允许触发板端二次校准——
+  // 板端用的是它自己的深度相机值，不读吊舱帧，所以这条命令本身是安全的
+  const podNoMm = (frameSrc!=='stereo' && !POD_MM);
   if(inlierIdx.length < 4){
     document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
     return;
   }
-  if(lastDx == null || lastDy == null){
+  if(!podNoMm && (lastDx == null || lastDy == null)){
     document.getElementById('hint').textContent='dx/dy 未计算，请先标注四孔再校准';
     return;
   }
@@ -684,11 +698,13 @@ function calibrate(){
   const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
   const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
   const cx = rr.cx*kx, cy = rr.cy*ky;
-  // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存
+  // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存；吊舱帧不出 mm 就不写
+  if(!podNoMm){
   if(frameSrc==='stereo'){ ST_REF_X=cx; ST_REF_Y=cy; stCalibrated=true;
     try{ localStorage.setItem('stereo_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
   else { REF_X=cx; REF_Y=cy; calibrated=true;
     try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
+  }
   if(frameSrc==='stereo'){
     // 双目基准是 App 本地量，不通知板端、不锁 UI（板端 calibrate 会动平台，危险）
     document.getElementById('hint').textContent='双目基准已就地保存 ('+cx.toFixed(1)+','+cy.toFixed(1)+') px —— 本地生效，未通知板端';
@@ -699,7 +715,9 @@ function calibrate(){
   if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
   updateCalibButton(1);  // 立即置「校准中」禁点
   lockUIFor(60000, '⏳ 校准中，请稍候…');   // 校准期间全局锁定，收到完成/失败状态或 60s 超时解锁
-  document.getElementById('hint').textContent='已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
+  document.getElementById('hint').textContent = podNoMm
+    ? '已触发板端二次校准（板端用自己的深度相机值；吊舱帧不出 mm，参考点未改）'
+    : '已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
   recompute();
 }
 
@@ -915,6 +933,8 @@ loadSettings();
 applyConfig();
 startMqttFromConfig();
 recompute();
+/* POD_MM=false：吊舱帧不出 mm，隐藏「吊舱dx/dy」两格，避免常显 '—' 像坏了；改 true 自动恢复 */
+if(!POD_MM)['vgdx','vgdy'].forEach(id=>{const e=document.getElementById(id);if(e&&e.parentElement)e.parentElement.style.display='none'});
 loadExternalConfig();
 /* 提示条：内容变化时短暂显示 3.5s 后自动淡出，避免长时间压住画面 */
 (function(){
