@@ -256,7 +256,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 
       <div class="sec">标定</div>
       <label class="row">scale（mm/px，吊舱）<input id="setScale" type="number" step="0.001" /></label>
-      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.830</b> mm/px（1536×1280；零位同帧标定 2026-11-06：深度图 900.7mm÷fx1081.76=0.8326 与板尺互验 0.8235，差 1.1%。旧 0.680 作废）</span></div>
+      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.833</b> mm/px（1536×1280，零位_20261106_1203 八帧 z/fx 均值 0.8328；旧 0.830 与 0.680 作废）</span></div>
       <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
       <div class="tr"><span id="stRef">—</span></div>
       <div class="tr" style="font-size:11px;color:var(--muted);line-height:1.6">换算依据：吊舱与双目在零位同帧实测，<b>毫米层面 1:1 相等</b>（归零后双目 0.0±0.6mm、吊舱 0.0±1.9mm）⇒ 吊舱的 dx/dy 就是双目的 dx/dy。双目 scale 只用来反推「板心应出现在双目画面哪个像素」便于比对。两套常量各按各的帧分辨率标定，<b>不可共用</b>；点「校准」在现场零位重采会覆盖当前帧来源那套的默认值。</div>
@@ -399,7 +399,7 @@ let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
 // 零位同帧标定 2026-11-06（板上连抓 8 组、5 组两路全检出，均值±SD）
 // 吊舱与双目各一套常量，基准点/scale 都按各自帧分辨率标定，绝不能共用
 let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
-let ST_REF_X = 784.4, ST_REF_Y = 559.1, ST_SCALE = 0.830, stCalibrated = false;            // 双目 1536×1280 SD(0.7,0.5)px
+let ST_REF_X = 786.0, ST_REF_Y = 560.0, ST_SCALE = 0.8328, stCalibrated = false;            // 双目 1536×1280 零位_20261106_1203 八帧对角线交点均值 SD(0.77,0.73)px
 let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
 let manualPending = null;   // 板端发来的人工标注请求(aruco/manual/request)，非空=处于人工补标模式
 
