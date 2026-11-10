@@ -330,13 +330,27 @@ function enumerate4(n){const out=[];
   if(n<=12){for(let a=0;a<n-3;a++)for(let b=a+1;b<n-2;b++)for(let c=b+1;c<n-1;c++)for(let d=c+1;d<n;d++)out.push([a,b,c,d])}
   else{const seen=new Set();for(let t=0;t<2000;t++){const i=[];while(i.length<4){const r=Math.floor(Math.random()*n);if(!i.includes(r))i.push(r)}i.sort((a,b)=>a-b);const k=i.join(',');if(!seen.has(k)){seen.add(k);out.push(i)}}}
   return out}
+/* 四孔中心 = 两条对角线交点（与板端 hole_hybrid.cc:372-384 同一算法，透视正确）
+   按 y 升序取上两点定 TL/TR、下两点定 BL/BR；平行退化时退化为四点均值 */
+function diagCenter(pts){
+  if(!pts || pts.length<4) return null;
+  const a=pts.slice().sort((p,q)=>p.y-q.y);
+  const p0=a[0],p1=a[1],p2=a[2],p3=a[3];
+  const TL=p0.x<p1.x?p0:p1, TR=p0.x<p1.x?p1:p0;
+  const BL=p2.x<p3.x?p2:p3, BR=p2.x<p3.x?p3:p2;
+  const d=(BR.x-TL.x)*(BL.y-TR.y)-(BR.y-TL.y)*(BL.x-TR.x);
+  if(Math.abs(d)<1e-6) return {x:(TL.x+TR.x+BL.x+BR.x)/4,y:(TL.y+TR.y+BL.y+BR.y)/4};
+  const num=(TR.x-TL.x)*(BL.y-TR.y)-(TR.y-TL.y)*(BL.x-TR.x);
+  const k=num/d;
+  return {x:TL.x+k*(BR.x-TL.x), y:TL.y+k*(BR.y-TL.y)};
+}
 function robustCentroid(pts){const n=pts.length;if(n<4)return null;
-  if(n===4){const cx=pts.reduce((s,p)=>s+p.x,0)/4,cy=pts.reduce((s,p)=>s+p.y,0)/4;return{cx,cy,inliers:[0,1,2,3]}}
+  if(n===4){const c=diagCenter(pts);return{cx:c.x,cy:c.y,inliers:[0,1,2,3]}}
   let best=Infinity,bi=null;
   for(const idx of enumerate4(n)){const res=parallelogramResidual(idx.map(i=>pts[i]));if(res<best){best=res;bi=idx}}
   if(!bi)return null;
-  const cx=bi.reduce((s,i)=>s+pts[i].x,0)/4,cy=bi.reduce((s,i)=>s+pts[i].y,0)/4;
-  return{cx,cy,inliers:bi}}
+  const c=diagCenter(bi.map(i=>pts[i]));
+  return{cx:c.x,cy:c.y,inliers:bi}}
 
 /* ============ 自动检测圆（迁移板端"外接矩形法"：Otsu + 连通域 + 圆度） ============ */
 function detectCircles(){
