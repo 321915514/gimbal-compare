@@ -529,14 +529,18 @@ function recompute(){
   const r=robustCentroid(mp);
   if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
   inlierIdx=r.inliers;
+  // 帧尺寸还原：双目图板端按 max_side=1280 下发(1536×1280→1280×1066)，参考点/scale 是 1536×1280 口径
+  const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
+  const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
+  const cxN = r.cx*kx, cyN = r.cy*ky;
   // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
   const RX = frameSrc==='stereo'?ST_REF_X:REF_X, RY = frameSrc==='stereo'?ST_REF_Y:REF_Y,
         SC = frameSrc==='stereo'?ST_SCALE:SCALE;
-  const dx=(RX-r.cx)*SC, dy=(RY-r.cy)*SC;   // 简化：参考点 + 比例
+  const dx=(RX-cxN)*SC, dy=(RY-cyN)*SC;   // 简化：参考点 + 比例
   lastDx=dx; lastDy=dy;
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
-  $('vscenter').textContent='('+(ST_REF_X-dx/ST_SCALE).toFixed(1)+', '+(ST_REF_Y-dy/ST_SCALE).toFixed(1)+') px';
+  $('vscenter').textContent='('+cxN.toFixed(1)+', '+cyN.toFixed(1)+') px';
   // 已校准后自动发布 dx/dy（发送 MQTT 保留）
   if(calibrated){
     const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
@@ -674,9 +678,12 @@ function calibrate(){
     document.getElementById('hint').textContent='dx/dy 未计算，请先标注四孔再校准';
     return;
   }
-  const pts = inlierIdx.map(i=>marks[i]);
-  const cx = pts.reduce((s,m)=>s+m.cx,0)/4;
-  const cy = pts.reduce((s,m)=>s+m.cy,0)/4;
+  // 与 recompute 同口径：对角线交点(4点/3点)，再还原到标定分辨率(双目 1536×1280 / 吊舱 1280×720)
+  const rr = robustCentroid(inlierIdx.map(i=>({x:marks[i].cx,y:marks[i].cy})));
+  if(!rr){document.getElementById('hint').textContent='四孔退化，取不到中心';return}
+  const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
+  const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
+  const cx = rr.cx*kx, cy = rr.cy*ky;
   // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存
   if(frameSrc==='stereo'){ ST_REF_X=cx; ST_REF_Y=cy; stCalibrated=true;
     try{ localStorage.setItem('stereo_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
