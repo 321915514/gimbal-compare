@@ -333,6 +333,13 @@ function enumerate4(n){const out=[];
 /* 四孔中心 = 两条对角线交点（与板端 hole_hybrid.cc:372-384 同一算法）
    不分形状，统一：按 y 升序取上两点(左/右)、下两点(左/右)，交点 = TL-BR × TR-BL */
 function diagCenter(pts){
+  if(pts.length===3){                                   // 3 点：最远两点连成的就是对角线，取中点
+    const dd=(i,j)=>{const A=pts[i],B=pts[j];return (A.x-B.x)*(A.x-B.x)+(A.y-B.y)*(A.y-B.y)};
+    let ij=[0,1],bd=dd(0,1);
+    for(const p of [[0,2],[1,2]]){const v=dd(p[0],p[1]);if(v>bd){bd=v;ij=p}}
+    const A=pts[ij[0]],B=pts[ij[1]];
+    return {x:(A.x+B.x)/2, y:(A.y+B.y)/2};
+  }
   const a=pts.slice().sort((p,q)=>p.y-q.y);
   const p0=a[0],p1=a[1],p2=a[2],p3=a[3];
   const TL=p0.x<p1.x?p0:p1, TR=p0.x<p1.x?p1:p0;
@@ -341,8 +348,8 @@ function diagCenter(pts){
   const k=((TR.x-TL.x)*(BL.y-TR.y)-(TR.y-TL.y)*(BL.x-TR.x))/d;
   return {x:TL.x+k*(BR.x-TL.x), y:TL.y+k*(BR.y-TL.y)};   // 四点共线时 d=0 → NaN，按无效处理
 }
-function robustCentroid(pts){const n=pts.length;if(n<4)return null;
-  if(n===4){const c=diagCenter(pts);return Number.isFinite(c.x)?{cx:c.x,cy:c.y,inliers:[0,1,2,3]}:null}
+function robustCentroid(pts){const n=pts.length;if(n<3)return null;
+  if(n<=4){const c=diagCenter(pts);return Number.isFinite(c.x)?{cx:c.x,cy:c.y,inliers:pts.map((_,i)=>i)}:null}
   let best=Infinity,bi=null;
   for(const idx of enumerate4(n)){const res=parallelogramResidual(idx.map(i=>pts[i]));if(res<best){best=res;bi=idx}}
   if(!bi)return null;
@@ -515,7 +522,7 @@ function fmt(v,d){if(isNaN(v))return '—';const z=Math.pow(10,-d)/2;return (Mat
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
 function recompute(){
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
-  if(marks.length<4){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+  if(marks.length<3){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';$('vscenter').textContent='—';
     inlierIdx=[];lastDx=lastDy=null;draw();return}
   const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
