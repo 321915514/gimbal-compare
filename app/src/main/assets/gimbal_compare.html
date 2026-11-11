@@ -58,6 +58,9 @@ button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
   border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.25);flex:none}
 .panel h3{margin:0 0 4px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px;
   text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.panel h3 em{font-style:normal;margin-left:auto;font-size:9px;font-weight:700;letter-spacing:0;
+  text-transform:none;color:var(--muted);background:var(--panel2);border:1px solid var(--border);
+  border-radius:5px;padding:1px 5px}
 .panel h3::before{content:'';width:3px;height:13px;border-radius:2px;
   background:linear-gradient(180deg,var(--accent),var(--accent2))}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -77,20 +80,30 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .cmp .cell.delta-ok{border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.08)}
 .cmp .cell.delta-bad{border-color:rgba(255,93,93,.5);background:rgba(255,93,93,.1)}
 .cmp .lbl{font-size:10px;color:var(--muted)}
-.cmp .val{font-size:13px;font-weight:700;font-family:Consolas,monospace;margin-top:1px;letter-spacing:-.5px}
+.cmp .val{font-size:13px;font-weight:700;font-family:Consolas,monospace;margin-top:1px;letter-spacing:-.5px;
+  font-variant-numeric:tabular-nums}
 .cmp .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
 .cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
-/* 吊舱与双目 dx/dy 并成一行 4 格；结果区可收缩，方向键/缩放键钉在底部永不被挤 */
-.cmp.one{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
-.cmp.one .cell{padding:3px 6px;border-radius:8px}
-.cmp.one .lbl{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cmp.one .val{font-size:12.5px;margin-top:0;letter-spacing:-.3px;white-space:nowrap}
-.cmp.one .val small{display:none}
+/* 结果区：dx/dy 两块大数 + 合位移；吊舱两格在 POD_MM=false 时由 JS 隐藏 */
+.cmp.one{grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cmp.one .cell{padding:7px 11px;border-radius:12px}
+.cmp.one .lbl{font-size:10.5px;letter-spacing:.6px;color:var(--muted)}
+.cmp.one .val{font-size:21px;line-height:1.15;margin-top:2px;letter-spacing:-.5px}
+.cmp.one .val small{display:inline;font-size:10.5px;margin-left:3px;opacity:.7}
 .res{flex:0 1 auto;min-height:0;overflow:hidden}
-.res .note{display:flex;gap:6px;justify-content:space-between;font-size:9.5px;color:var(--muted);
-  margin-top:3px;white-space:nowrap;overflow:hidden}
+.sumline{display:flex;align-items:baseline;gap:5px;margin-top:8px;font-size:11px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:6px 10px}
+.sumline b{font-size:15px;color:var(--fg);font-family:Consolas,monospace;font-variant-numeric:tabular-nums}
+.sumline .u{font-size:10px;opacity:.65}
+.sumline .dir{margin-left:auto;color:var(--muted);font-size:9.5px;border:1px solid var(--border);
+  border-radius:999px;padding:1px 7px;white-space:nowrap}
+.res .note{display:flex;gap:6px;align-items:baseline;font-size:10.5px;color:var(--muted);
+  margin-top:7px;line-height:1.45;white-space:nowrap;overflow:hidden}
 .res .note>span{overflow:hidden;text-overflow:ellipsis}
+.res .note b{color:#b9c8e4;font-weight:600;font-family:Consolas,monospace}
+.res .note>span:first-child{flex:1;min-width:0}
 .side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
+.side .panel .padwrap{flex:0 0 auto}
 .verdict{margin-top:11px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:600;
   display:none;align-items:center;gap:8px;line-height:1.5}
 .verdict.show{display:flex}
@@ -160,15 +173,18 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 #lockMask .box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
   padding:16px 28px;font-size:14px;font-weight:700;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
-.dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);
-  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:auto}
-.dpad .nav{height:46px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+.padwrap{margin-top:auto;border-top:1px solid var(--border);padding-top:6px}
+.padtip{font-size:10px;color:var(--muted);text-align:center;margin-bottom:4px;letter-spacing:.6px}
+.padrow{display:flex;gap:7px;align-items:center;justify-content:center}
+.dpad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center}
+.dpad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);font-size:20px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dpad .nav:active{transform:scale(.88);background:var(--panel)}
 #mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
-.sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-.sizepad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+.sizepad{display:flex;flex-direction:column;gap:6px;width:62px}
+.sizepad .nav{height:57px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .sizepad .nav:active{transform:scale(.94);background:var(--panel)}
@@ -183,19 +199,19 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 <div id="app">
   <header>
     <div class="logo">校</div>
-    <div class="t">吊舱↔双目 对比验证<small>Gimbal ↔ Stereo Calibration Check</small></div>
+    <div class="t">手动校准<small>Manual Calibration</small></div>
     <div class="sp"></div>
     <span class="pill" id="pill"><span class="dot"></span><span id="stat">未取帧</span></span>
   </header>
 
   <div class="toolbar">
-    <button class="act primary" id="fetchFrame">📷 获取帧</button>
-    <button class="act" id="grabStereo">👁 获取双目</button>
+    <button class="act primary" id="grabStereo">👁 获取双目</button>
     <button class="act" id="detect">⭕ 检测圆</button>
     <button class="act" id="calibrate">🎯 校准</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
     <button class="act ghost" id="btnSettings" title="设置">⚙️</button>
+    <button class="act" id="fetchFrame" style="display:none">📷 获取帧</button>
     <div class="legend">
       <span class="lg"><i style="background:#22c55e"></i>计算用</span>
       <span class="lg"><i style="background:#ff5d5d"></i>已剔除</span>
@@ -207,20 +223,28 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <div class="main" id="mainBox">
       <canvas id="cv"></canvas>
       <div class="spinner" id="spinner"></div>
-      <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，点孔标注（自动吸附），点圆选中后按钮微调</div>
+      <div class="hintbar" id="hint">点「获取双目」拉取板端双目帧；点「检测圆」自动找孔，或点图手动标孔（自动吸附），选中圆后按钮微调</div>
     </div>
     <div class="side">
   <div class="panel">
-    <h3>计算结果 · 四孔中心（mm）</h3>
+    <h3>纠偏量<em>mm</em></h3>
     <div class="res">
       <div class="cmp one">
         <div class="cell"><div class="lbl">吊舱dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
         <div class="cell"><div class="lbl">吊舱dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
-        <div class="cell real"><div class="lbl">双目dx</div><div class="val real" id="vsdx">—<small>mm</small></div></div>
-        <div class="cell real"><div class="lbl">双目dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">水平 dx</div><div class="val real" id="vsdx">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">垂直 dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
       </div>
-      <div class="note"><span id="curCam">当前帧：吊舱 1280×720</span><span>板心 <b id="vscenter">—</b></span></div>
+      <div class="sumline">
+        <span>合位移</span><b id="vstot">—</b><span class="u">mm</span>
+        <span class="dir" id="vsdir">—</span>
+      </div>
+      <div class="note"><span>帧源</span><b id="curCam">双目 · 未取帧</b></div>
+      <div class="note"><span>板心</span><b id="vscenter">—</b></div>
     </div>
+    <div class="padwrap">
+    <div class="padtip">选中圆微调</div>
+    <div class="padrow">
     <div class="dpad">
       <button class="nav" id="mvUp">↑</button>
       <button class="nav" id="mvLeft">←</button>
@@ -228,8 +252,10 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <button class="nav" id="mvDown">↓</button>
     </div>
     <div class="sizepad">
-      <button class="nav" id="shrink">缩小圆</button>
-      <button class="nav" id="enlarge">放大圆</button>
+      <button class="nav" id="shrink">缩小</button>
+      <button class="nav" id="enlarge">放大</button>
+    </div>
+    </div>
     </div>
   </div>
 
@@ -253,6 +279,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       </div>
       <label class="row">吊舱 RTSP<input id="setRtsp" placeholder="rtsp://192.168.144.25:8554/main.264" /></label>
       <div class="tr"><button class="bt" id="setTestRtsp">测试 RTSP</button><span id="setRtspOut">—</span></div>
+      <div class="tr"><button class="bt" id="setPodFrame">抓取吊舱帧</button><span style="color:var(--muted)">仅看图/手动标注，不出 mm、不参与纠偏</span></div>
 
       <div class="sec">标定</div>
       <label class="row">scale（mm/px，吊舱）<input id="setScale" type="number" step="0.001" /></label>
@@ -400,7 +427,7 @@ let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
 // 吊舱与双目各一套常量，基准点/scale 都按各自帧分辨率标定，绝不能共用
 let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
 let ST_REF_X = 786.0, ST_REF_Y = 560.0, ST_SCALE = 0.8328, stCalibrated = false;            // 双目 1536×1280 零位_20261106_1203 八帧对角线交点均值 SD(0.77,0.73)px
-let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
+let frameSrc = 'stereo';   // 当前标注帧来源：'stereo' 双目(默认,唯一出mm的) / 'pod' 吊舱(仅看图标注)
 const POD_MM = false;   // 吊舱帧是否计算 dx/dy(mm)：默认关。吊舱在云台上，角度一转/变焦一变，REF+SCALE 同时失效
                         // （实测零位同帧吊舱 −8/−8 vs 双目 20/−6）。要恢复：把云台锁到零位角度、变焦锁死，
                         // 重跑零位同帧标定后把这里改 true，并同时校准 REF_X/REF_Y。
@@ -450,13 +477,16 @@ function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.he
     const col=sel?'#ffc400':(inl?'#22c55e':'#ff5d5d');
     ring(m.cx,m.cy,m.r,col,sel?3.5:(inl?2.5:1.6));
     dot(m.cx,m.cy,col,sel?7:(inl?4.5:3));
-    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
+    ctx.font='bold 12px sans-serif';
+    ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.75)';
+    ctx.strokeText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8);
+    ctx.fillStyle=col;ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
 }
 function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
 img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');
   const nm=frameSrc==='stereo'?'双目':'吊舱', want=frameSrc==='stereo'?[1536,1280]:[1280,720];
-  const cc=$('curCam'); if(cc) cc.textContent='当前帧：'+nm+' 标定口径 '+want[0]+'×'+want[1]+'，实际 '+img.width+'×'+img.height+(frameSrc==='stereo'?'':'（吊舱帧不出 mm）');
+  const cc=$('curCam'); if(cc) cc.textContent=nm+' '+img.width+'×'+img.height+(frameSrc==='stereo'?(img.width===want[0]?'':'（已按 1.2× 还原口径）'):' · 不出 mm');
   let h = frameSrc==='stereo'
     ? '已取帧（双目），点「检测圆」或手动点孔标注；dx/dy 按零位基准 (786.0, 560.0)、scale 0.8328 算'
     : '已取帧（吊舱），只用于看图/标注；吊舱在云台上，角度或变焦一变 mm 就不准，纠偏值统一看双目帧';
@@ -515,6 +545,8 @@ function grabStereo(){
   mqttPublish(mcfg.stereoGrab, JSON.stringify({cmd:"grab"}));
 }
 document.getElementById('fetchFrame').onclick=()=>fetchFrame();
+const _pod=document.getElementById('setPodFrame');   // 吊舱帧入口移到设置页：只看图/标注，不出 mm
+if(_pod) _pod.onclick=()=>{try{closeSettings()}catch(e){} fetchFrame()};
 document.getElementById('grabStereo').onclick=()=>grabStereo();
 document.getElementById('detect').onclick=()=>autoDetect();
 document.getElementById('calibrate').onclick=()=>calibrate();
@@ -525,14 +557,16 @@ document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recomp
 const $=id=>document.getElementById(id);
 function fmt(v,d){if(isNaN(v))return '—';const z=Math.pow(10,-d)/2;return (Math.abs(v)<z?0:v).toFixed(d)}   // 避免出现 "-0mm"
 function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
+function setT(id,txt){const e=$(id);if(e)e.textContent=txt}   // 元素不存在时静默跳过（离线测试沙箱）
 function recompute(){
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<3){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';$('vscenter').textContent='—';
+    setT('vstot','—');setT('vsdir','—');
     inlierIdx=[];lastDx=lastDy=null;draw();return}
   const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
   const r=robustCentroid(mp);
-  if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
+  if(!r){inlierIdx=[];lastDx=lastDy=null;setT('vstot','—');setT('vsdir','孔位退化');draw();return}
   inlierIdx=r.inliers;
   // 帧尺寸还原：双目图板端按 max_side=1280 下发(1536×1280→1280×1066)，参考点/scale 是 1536×1280 口径
   const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
@@ -543,6 +577,7 @@ function recompute(){
   if(frameSrc!=='stereo' && !POD_MM){
     $('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';
+    setT('vstot','—');setT('vsdir','吊舱帧不出 mm');
     lastDx=lastDy=null; draw(); return;
   }
   // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
@@ -550,6 +585,9 @@ function recompute(){
         SC = frameSrc==='stereo'?ST_SCALE:SCALE;
   const dx=(RX-cxN)*SC, dy=(RY-cyN)*SC;   // 简化：参考点 + 比例
   lastDx=dx; lastDy=dy;
+  const tot=Math.hypot(dx,dy);
+  setT('vstot',fmt(tot,1));
+  setT('vsdir','参与 '+(inlierIdx.length||marks.length)+'/4');
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
   // 已校准后自动发布 dx/dy（只在双目帧上发，吊舱帧的 mm 不可信，绝不发）

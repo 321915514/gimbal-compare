@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<title>手动校准</title>
+<style>
+:root{
+  --bg:#0a0f1e; --bg2:#0d1426; --panel:#121a2e; --panel2:#18233c; --border:#22304d;
+  --fg:#e8eefb; --muted:#8b98b2; --accent:#4f8cff; --accent2:#7c5cff;
+  --ok:#2ecc71; --warn:#f5a623; --danger:#ff5d5d; --real:#5cb3ff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(160deg,var(--bg),var(--bg2) 70%);
+  color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:10px;padding:8px 14px;padding-top:calc(8px + env(safe-area-inset-top));
+  background:rgba(18,26,46,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);flex:none}
+.logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex:none}
+header .t{font-size:13px;font-weight:700;letter-spacing:.4px}
+header .t small{display:inline;font-size:9px;color:var(--muted);font-weight:400;letter-spacing:.2px;margin-left:7px}
+header .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:5px 12px}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:#4a5870}
+.pill.ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.pill.busy .dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.toolbar{display:flex;gap:8px;padding:8px 14px;flex:none;align-items:center}
+button.act{height:38px;padding:0 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);font-size:13px;font-weight:600;cursor:pointer;transition:.14s;white-space:nowrap}
+button.act:active{transform:scale(.95)}
+button.act.ghost{background:transparent;color:var(--muted)}
+button.act.ghost:hover{border-color:var(--accent);color:var(--fg)}
+button.act.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;
+  box-shadow:0 4px 14px rgba(79,140,255,.35);font-size:14px;padding:0 22px}
+button.act.primary:hover{filter:brightness(1.1)}
+button.act:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.body{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden}
+.main{flex:1;min-width:0;position:relative;overflow:hidden;background:#05070f;border-right:1px solid var(--border);touch-action:none;margin-bottom:6px}
+.main canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;-ms-touch-action:none}
+.side{width:235px;min-width:0;overflow:hidden;padding:11px 11px 2px;background:var(--bg2);touch-action:none}
+.side .panel{margin:0;height:100%;min-height:0;display:flex;flex-direction:column;padding:6px 12px}
+.side details{border:1px solid var(--border);border-radius:12px;background:var(--panel);overflow:hidden}
+.side details summary{padding:10px 13px;cursor:pointer;color:var(--muted);font-size:12.5px;font-weight:600;
+  list-style:none;user-select:none}
+.side details summary::-webkit-details-marker{display:none}
+.side details[open] summary{color:var(--fg);border-bottom:1px solid var(--border)}
+.side details .panel{margin:0;border:0;border-radius:0;background:transparent;padding:11px 13px}
+@media(orientation:portrait),(max-width:560px){.body{flex-direction:column}.side{width:auto;flex:none;overflow:hidden;touch-action:none}}
+.hintbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:12px;color:var(--muted);
+  background:rgba(5,7,15,.82);padding:6px 15px;border-radius:20px;pointer-events:none;white-space:nowrap;
+  border:1px solid var(--border);opacity:0;transition:opacity .35s}
+.hintbar.show{opacity:1}
+.panel{margin:11px 18px 0;padding:8px 12px;border-radius:14px;background:var(--panel);
+  border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.25);flex:none}
+.panel h3{margin:0 0 4px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:1px;
+  text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.panel h3::before{content:'';width:3px;height:13px;border-radius:2px;
+  background:linear-gradient(180deg,var(--accent),var(--accent2))}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
+.field input{width:76px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);padding:0 8px;font-size:14px;text-align:right;font-family:Consolas,monospace}
+.field input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
+.field input.big{width:112px}
+textarea{width:100%;height:48px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);padding:9px 11px;font-size:12.5px;font-family:Consolas,monospace;resize:vertical}
+textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba(79,140,255,.15)}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;flex:0 0 auto}
+.cmp .cell{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:5px 10px;text-align:left;
+  display:flex;flex-direction:column;justify-content:center;
+  transition:.15s}
+.cmp .cell.real{border-color:rgba(92,179,255,.4);background:rgba(92,179,255,.06)}
+.cmp .cell.delta-ok{border-color:rgba(46,204,113,.45);background:rgba(46,204,113,.08)}
+.cmp .cell.delta-bad{border-color:rgba(255,93,93,.5);background:rgba(255,93,93,.1)}
+.cmp .lbl{font-size:10px;color:var(--muted)}
+.cmp .val{font-size:13px;font-weight:700;font-family:Consolas,monospace;margin-top:1px;letter-spacing:-.5px}
+.cmp .val small{font-size:11px;font-weight:400;color:var(--muted);margin-left:2px}
+.cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
+/* 吊舱与双目 dx/dy 并成一行 4 格；结果区可收缩，方向键/缩放键钉在底部永不被挤 */
+.cmp.one{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-top:6px}
+.cmp.one .cell{padding:3px 6px;border-radius:8px}
+.cmp.one .lbl{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmp.one .val{font-size:12.5px;margin-top:0;letter-spacing:-.3px;white-space:nowrap}
+.cmp.one .val small{display:none}
+.res{flex:0 1 auto;min-height:0;overflow:hidden}
+.res .note{display:flex;gap:6px;justify-content:space-between;font-size:9.5px;color:var(--muted);
+  margin-top:3px;white-space:nowrap;overflow:hidden}
+.res .note>span{overflow:hidden;text-overflow:ellipsis}
+.side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
+.verdict{margin-top:11px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:600;
+  display:none;align-items:center;gap:8px;line-height:1.5}
+.verdict.show{display:flex}
+.verdict.good{background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.4);color:var(--ok)}
+.verdict.bad{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.45);color:var(--danger)}
+.verdict.mute{background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.small{font-size:11px;color:var(--muted);line-height:1.6}
+
+/* ===== 炫酷增强 ===== */
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(600px 420px at 12% 8%,rgba(79,140,255,.20),transparent 60%),
+             radial-gradient(520px 400px at 88% 92%,rgba(124,92,255,.18),transparent 60%),
+             radial-gradient(420px 320px at 82% 12%,rgba(46,204,113,.10),transparent 60%)}
+#app{position:relative;z-index:1}
+.panel,.side details{backdrop-filter:blur(14px);background:rgba(18,26,46,.72)}
+.panel{transition:border-color .25s,box-shadow .25s}
+.panel:hover{border-color:rgba(79,140,255,.35);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 0 1px rgba(79,140,255,.08)}
+button.act.primary{position:relative;overflow:hidden}
+button.act.primary::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(110deg,transparent 32%,rgba(255,255,255,.38) 50%,transparent 68%);
+  transform:translateX(-100%);animation:shine 3.2s ease-in-out infinite}
+@keyframes shine{0%,55%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.pill.ok .dot,.pill.busy .dot{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.9)}}
+.cmp .val{background:linear-gradient(135deg,#ffffff,#9fc2ff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;font-size:15px;font-variant-numeric:tabular-nums}
+.main::after{content:none}
+header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent}
+.logo{animation:logoGlow 3s ease-in-out infinite alternate}
+@keyframes logoGlow{from{box-shadow:0 0 10px rgba(79,140,255,.4)}to{box-shadow:0 0 20px rgba(124,92,255,.65)}}
+/* 加载转圈 */
+.spinner{position:absolute;top:50%;left:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+  border:4px solid rgba(79,140,255,.18);border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;display:none;pointer-events:none;z-index:6}
+.spinner.show{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main .spinner{box-shadow:0 0 24px rgba(79,140,255,.35)}
+/* ===== 设置页 ===== */
+#settingsMask{position:fixed;inset:0;background:rgba(3,6,14,.75);display:none;z-index:40}
+#settingsMask.show{display:block}
+.sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(600px,94vw);max-height:90vh;
+  display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 18px 50px rgba(0,0,0,.65)}
+.sheet .head{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;
+  border-bottom:1px solid var(--border);font-size:13px;font-weight:700}
+.sheet .sc{overflow:auto;padding:10px 14px;display:flex;flex-direction:column;gap:9px}
+.sheet .foot{display:flex;gap:8px;justify-content:flex-end;padding:9px 14px;border-top:1px solid var(--border)}
+.sheet label.row{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted)}
+.sheet input,.sheet textarea{width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  color:var(--fg);font-size:12px;padding:5px 8px;font-family:Consolas,monospace}
+.sheet textarea{resize:vertical;min-height:40px}
+.sheet input[type=checkbox]{width:auto}
+.sheet .sec{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px;margin-top:3px}
+.sheet .tr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.sheet .bt{cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--fg);
+  border-radius:8px;padding:6px 13px;font-size:12px}
+.sheet .bt.pri{background:var(--accent);border-color:transparent;color:#fff;font-weight:700}
+.sheet details summary{font-size:11.5px;color:var(--muted);cursor:pointer;padding:3px 0;user-select:none}
+#stOut{font-family:Consolas,monospace;font-size:11.5px;line-height:1.65;white-space:pre-wrap;
+  background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:7px 9px;min-height:32px}
+#setTestOut.ok,#setRtspOut.ok{color:#22c55e}#setTestOut.bad,#setRtspOut.bad{color:#ff5d5d}
+/* 校准期间全局锁定 */
+#lockMask{position:fixed;inset:0;display:none;z-index:38;background:rgba(3,6,14,.58);
+  align-items:center;justify-content:center}
+#lockMask.show{display:flex}
+#lockMask .box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+  padding:16px 28px;font-size:14px;font-weight:700;box-shadow:0 12px 40px rgba(0,0,0,.6)}
+/* 十字方向键（小按钮） + 圆大小按钮 */
+.dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px);
+  grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center;margin-top:auto}
+.dpad .nav{height:46px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--fg);font-size:20px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.dpad .nav:active{transform:scale(.88);background:var(--panel)}
+#mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
+.sizepad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.sizepad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+  color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.sizepad .nav:active{transform:scale(.94);background:var(--panel)}
+/* 颜色图例 */
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--muted);margin-left:auto;white-space:nowrap}
+.legend .lg{display:inline-flex;align-items:center;gap:5px}
+.legend .lg i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+</style>
+<script src="config.js"></script>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">校</div>
+    <div class="t">吊舱↔双目 对比验证<small>Gimbal ↔ Stereo Calibration Check</small></div>
+    <div class="sp"></div>
+    <span class="pill" id="pill"><span class="dot"></span><span id="stat">未取帧</span></span>
+  </header>
+
+  <div class="toolbar">
+    <button class="act primary" id="fetchFrame">📷 获取帧</button>
+    <button class="act" id="grabStereo">👁 获取双目</button>
+    <button class="act" id="detect">⭕ 检测圆</button>
+    <button class="act" id="calibrate">🎯 校准</button>
+    <button class="act ghost" id="undo">撤销</button>
+    <button class="act ghost" id="clear">清空</button>
+    <button class="act ghost" id="btnSettings" title="设置">⚙️</button>
+    <div class="legend">
+      <span class="lg"><i style="background:#22c55e"></i>计算用</span>
+      <span class="lg"><i style="background:#ff5d5d"></i>已剔除</span>
+      <span class="lg"><i style="background:#ffc400"></i>选中</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="main" id="mainBox">
+      <canvas id="cv"></canvas>
+      <div class="spinner" id="spinner"></div>
+      <div class="hintbar" id="hint">点「获取帧」拉取吊舱帧，点孔标注（自动吸附），点圆选中后按钮微调</div>
+    </div>
+    <div class="side">
+  <div class="panel">
+    <h3>计算结果 · 四孔中心（mm）</h3>
+    <div class="res">
+      <div class="cmp one">
+        <div class="cell"><div class="lbl">吊舱dx</div><div class="val" id="vgdx">—<small>mm</small></div></div>
+        <div class="cell"><div class="lbl">吊舱dy</div><div class="val" id="vgdy">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">双目dx</div><div class="val real" id="vsdx">—<small>mm</small></div></div>
+        <div class="cell real"><div class="lbl">双目dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
+      </div>
+      <div class="note"><span id="curCam">当前帧：吊舱 1280×720</span><span>板心 <b id="vscenter">—</b></span></div>
+    </div>
+    <div class="dpad">
+      <button class="nav" id="mvUp">↑</button>
+      <button class="nav" id="mvLeft">←</button>
+      <button class="nav" id="mvRight">→</button>
+      <button class="nav" id="mvDown">↓</button>
+    </div>
+    <div class="sizepad">
+      <button class="nav" id="shrink">缩小圆</button>
+      <button class="nav" id="enlarge">放大圆</button>
+    </div>
+  </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===== 设置页 ===== -->
+<div id="settingsMask">
+  <div class="sheet">
+    <div class="head"><span>⚙️ 设置</span><button class="bt" id="setClose">关闭</button></div>
+    <div class="sc">
+      <div class="sec">网络</div>
+      <label class="row">MQTT broker（可填多个，逗号分隔，连上哪个用哪个）
+        <textarea id="setBroker" rows="2" placeholder="tcp://192.168.3.78:1883,tcp://192.168.2.82:1883"></textarea>
+      </label>
+      <div class="tr">
+        <button class="bt" id="setTestBroker">测试 broker</button>
+        <span id="setTestOut">—</span>
+        <span id="setLiveConn" style="margin-left:auto">当前连接：—</span>
+      </div>
+      <label class="row">吊舱 RTSP<input id="setRtsp" placeholder="rtsp://192.168.144.25:8554/main.264" /></label>
+      <div class="tr"><button class="bt" id="setTestRtsp">测试 RTSP</button><span id="setRtspOut">—</span></div>
+
+      <div class="sec">标定</div>
+      <label class="row">scale（mm/px，吊舱）<input id="setScale" type="number" step="0.001" /></label>
+      <div class="tr"><span style="color:var(--muted)">双目 scale：<b id="stereoScaleVal">0.833</b> mm/px（1536×1280，零位_20261106_1203 八帧 z/fx 均值 0.8328；旧 0.830 与 0.680 作废）</span></div>
+      <div class="tr"><span id="setRef">—</span><button class="bt" id="setResetRef">复位参考点</button></div>
+      <div class="tr"><span id="stRef">—</span></div>
+      <div class="tr" style="font-size:11px;color:var(--muted);line-height:1.6">换算依据：纠偏 dx/dy <b>只用双目帧</b>（板端深度相机同一路），零位基准 (786.0, 560.0)、scale 0.8328。吊舱帧不出 mm —— 吊舱装在云台上，云台角度或变焦一变，它的参考点和 mm/px 同时失效（实测零位同帧：吊舱 −8/−8 vs 双目 20/−6，差 28mm），所以吊舱帧只保留看图/手动标注。要在吊舱上也算 mm，得先把云台锁到零位角度、变焦锁死，重跑零位同帧标定，再把代码里 <code>POD_MM</code> 改 true。</div>
+
+      <details>
+        <summary>高级：MQTT 话题与客户端（一般不用改）</summary>
+        <label class="row">真值订阅 subscribe<input id="setSub" /></label>
+        <label class="row">结果发布 publish<input id="setPub" /></label>
+        <label class="row">校准命令 calibCmd<input id="setCalibCmd" /></label>
+        <label class="row">校准状态 calibStatus<input id="setCalibStatus" /></label>
+        <label class="row">双目请求 stereoGrab<input id="setSgrab" /></label>
+        <label class="row">双目返回 stereoImage<input id="setSimage" /></label>
+        <label class="row">clientId<input id="setClientId" /></label>
+        <label class="row">MQTT 开关<input id="setMqttOn" type="checkbox" /></label>
+      </details>
+
+      <div class="sec">功能自测</div>
+      <div class="tr">
+        <button class="bt" id="setSelfTest">开始自测</button>
+        <button class="bt" id="setReset">恢复出厂默认</button>
+      </div>
+      <div id="stOut">点「开始自测」逐项检查：配置格式 → MQTT 连接 → 双目取帧往返 → 真值/校准话题 → 画面与存储</div>
+    </div>
+    <div class="foot"><button class="bt pri" id="setSave">保存并应用</button></div>
+  </div>
+</div>
+
+<!-- ===== 校准锁定遮罩 ===== -->
+<div id="lockMask"><div class="box" id="lockText">⏳ 校准中，请稍候…</div></div>
+
+<script>
+'use strict';
+/* ================= 吸附（holesnap 算法） ================= */
+const DEFAULTS={windowR:160,minArea:80,searchR:40};
+function clamp(v,lo,hi){return v<lo?lo:(v>hi?hi:v)}
+function otsu(hist,total){let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];
+  let bg=0,mb=0,bestV=-1,bestT=127;
+  for(let i=0;i<256;i++){bg+=hist[i];if(bg===0)continue;const fg=total-bg;if(fg===0)break;
+    mb+=i*hist[i];const mbAvg=mb/bg,mfAvg=(sum-mb)/fg;const v=bg*fg*(mbAvg-mfAvg)*(mbAvg-mfAvg);
+    if(v>bestV){bestV=v;bestT=i}}return bestT}
+function snapImageData(id,u,v,opts){const o=Object.assign({},DEFAULTS,opts||{});
+  const W=id.width,H=id.height,data=id.data;
+  const x0=clamp(Math.floor(u-o.windowR),0,W-1),y0=clamp(Math.floor(v-o.windowR),0,H-1);
+  const x1=clamp(Math.ceil(u+o.windowR),0,W-1),y1=clamp(Math.ceil(v+o.windowR),0,H-1);
+  const w=x1-x0+1,h=y1-y0+1;if(w<=0||h<=0)return null;
+  const lum=new Uint8Array(w*h),hist=new Uint32Array(256);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const si=((y0+y)*W+(x0+x))*4;
+    const g=(data[si]*299+data[si+1]*587+data[si+2]*114)/1000|0;lum[y*w+x]=g;hist[g]++}
+  const t=otsu(hist,w*h);
+  let sx=clamp(Math.round(u-x0),0,w-1),sy=clamp(Math.round(v-y0),0,h-1);
+  if(lum[sy*w+sx]>t){let found=false;
+    for(let r=1;r<=o.searchR&&!found;r++)for(let dy=-r;dy<=r&&!found;dy++)for(let dx=-r;dx<=r;dx++){
+      const nx=sx+dx,ny=sy+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;
+      if(lum[ny*w+nx]<=t){sx=nx;sy=ny;found=true;break}}
+    if(!found)return null}
+  const seen=new Uint8Array(w*h),stack=[sy*w+sx];seen[sy*w+sx]=1;let n=0,sumx=0,sumy=0;
+  while(stack.length){const idx=stack.pop();if(lum[idx]>t)continue;
+    const cx=idx%w,cy=(idx/w)|0;n++;sumx+=cx;sumy+=cy;
+    if(cx>0&&!seen[idx-1]){seen[idx-1]=1;stack.push(idx-1)}
+    if(cx<w-1&&!seen[idx+1]){seen[idx+1]=1;stack.push(idx+1)}
+    if(cy>0&&!seen[idx-w]){seen[idx-w]=1;stack.push(idx-w)}
+    if(cy<h-1&&!seen[idx+w]){seen[idx+w]=1;stack.push(idx+w)}}
+  if(n<o.minArea)return null;
+  return{cx:x0+sumx/n,cy:y0+sumy/n,r:Math.sqrt(n/Math.PI),area:n}}
+
+/* ============ RANSAC 鲁棒质心：挑最像矩形的 4 个点，剔除误点的圆 ============ */
+function parallelogramResidual(p){const cx=(p[0].x+p[1].x+p[2].x+p[3].x)/4,cy=(p[0].y+p[1].y+p[2].y+p[3].y)/4;
+  const q=p.slice().sort((a,b)=>Math.atan2(a.y-cy,a.x-cx)-Math.atan2(b.y-cy,b.x-cx));
+  return Math.hypot((q[0].x+q[2].x-q[1].x-q[3].x)/2,(q[0].y+q[2].y-q[1].y-q[3].y)/2)}
+function enumerate4(n){const out=[];
+  if(n<=12){for(let a=0;a<n-3;a++)for(let b=a+1;b<n-2;b++)for(let c=b+1;c<n-1;c++)for(let d=c+1;d<n;d++)out.push([a,b,c,d])}
+  else{const seen=new Set();for(let t=0;t<2000;t++){const i=[];while(i.length<4){const r=Math.floor(Math.random()*n);if(!i.includes(r))i.push(r)}i.sort((a,b)=>a-b);const k=i.join(',');if(!seen.has(k)){seen.add(k);out.push(i)}}}
+  return out}
+/* 四孔中心 = 两条对角线交点（与板端 hole_hybrid.cc:372-384 同一算法）
+   不分形状，统一：按 y 升序取上两点(左/右)、下两点(左/右)，交点 = TL-BR × TR-BL */
+function diagCenter(pts){
+  if(pts.length===3){                                   // 3 点：最远两点连成的就是对角线，取中点
+    const dd=(i,j)=>{const A=pts[i],B=pts[j];return (A.x-B.x)*(A.x-B.x)+(A.y-B.y)*(A.y-B.y)};
+    let ij=[0,1],bd=dd(0,1);
+    for(const p of [[0,2],[1,2]]){const v=dd(p[0],p[1]);if(v>bd){bd=v;ij=p}}
+    const A=pts[ij[0]],B=pts[ij[1]];
+    return {x:(A.x+B.x)/2, y:(A.y+B.y)/2};
+  }
+  const a=pts.slice().sort((p,q)=>p.y-q.y);
+  const p0=a[0],p1=a[1],p2=a[2],p3=a[3];
+  const TL=p0.x<p1.x?p0:p1, TR=p0.x<p1.x?p1:p0;
+  const BL=p2.x<p3.x?p2:p3, BR=p2.x<p3.x?p3:p2;
+  const d=(BR.x-TL.x)*(BL.y-TR.y)-(BR.y-TL.y)*(BL.x-TR.x);
+  const k=((TR.x-TL.x)*(BL.y-TR.y)-(TR.y-TL.y)*(BL.x-TR.x))/d;
+  return {x:TL.x+k*(BR.x-TL.x), y:TL.y+k*(BR.y-TL.y)};   // 四点共线时 d=0 → NaN，按无效处理
+}
+function robustCentroid(pts){const n=pts.length;if(n<3)return null;
+  if(n<=4){const c=diagCenter(pts);return Number.isFinite(c.x)?{cx:c.x,cy:c.y,inliers:pts.map((_,i)=>i)}:null}
+  let best=Infinity,bi=null;
+  for(const idx of enumerate4(n)){const res=parallelogramResidual(idx.map(i=>pts[i]));if(res<best){best=res;bi=idx}}
+  if(!bi)return null;
+  const c=diagCenter(bi.map(i=>pts[i]));
+  return Number.isFinite(c.x)?{cx:c.x,cy:c.y,inliers:bi}:null}
+
+/* ============ 自动检测圆（迁移板端"外接矩形法"：Otsu + 连通域 + 圆度） ============ */
+function detectCircles(){
+  if(!off.width)return[];
+  const id=octx.getImageData(0,0,off.width,off.height);
+  const W=id.width,H=id.height,data=id.data,N=W*H;
+  const gray=new Uint8Array(N),hist=new Uint32Array(256);
+  for(let i=0;i<N;i++){const g=(data[i*4]*299+data[i*4+1]*587+data[i*4+2]*114)/1000|0;gray[i]=g;hist[g]++}
+  const t=otsu(hist,N);
+  let dark=0;for(let i=0;i<N;i++)if(gray[i]<t)dark++;
+  const invert=dark>N*0.5;                       // 暗背景→找亮孔（黑帽场景的近似）
+  const isHole=invert?(g)=>g>=t:(g)=>g<t;
+  const seen=new Uint8Array(N),comps=[];
+  for(let i=0;i<N;i++){
+    if(seen[i]||!isHole(gray[i]))continue;
+    const stack=[i];seen[i]=1;let area=0,sumx=0,sumy=0,minx=W,maxx=0,miny=H,maxy=0;
+    while(stack.length){const p=stack.pop();area++;
+      const x=p%W,y=(p/W)|0;sumx+=x;sumy+=y;
+      if(x<minx)minx=x;if(x>maxx)maxx=x;if(y<miny)miny=y;if(y>maxy)maxy=y;
+      if(x>0&&!seen[p-1]&&isHole(gray[p-1])){seen[p-1]=1;stack.push(p-1)}
+      if(x<W-1&&!seen[p+1]&&isHole(gray[p+1])){seen[p+1]=1;stack.push(p+1)}
+      if(y>0&&!seen[p-W]&&isHole(gray[p-W])){seen[p-W]=1;stack.push(p-W)}
+      if(y<H-1&&!seen[p+W]&&isHole(gray[p+W])){seen[p+W]=1;stack.push(p+W)}}
+    const bw=maxx-minx+1,bh=maxy-miny+1;
+    if(Math.min(bw,bh)/Math.max(bw,bh)>0.5 && area/(bw*bh)>0.4 && area>60)
+      comps.push({cx:sumx/area,cy:sumy/area,r:(bw+bh)/4,area});
+  }
+  comps.sort((a,b)=>b.area-a.area);
+  return comps.slice(0,4);
+}
+function autoDetect(){
+  const c=detectCircles();
+  if(!c.length){document.getElementById('hint').textContent='未检测到圆，可手动点孔';return}
+  marks=c.map(m=>({cx:m.cx,cy:m.cy,r:m.r,snapped:true,auto:true}));selected=-1;
+  draw();recompute();
+  document.getElementById('hint').textContent='检测到 '+c.length+' 个圆，点圆选中后用按钮微调';
+}
+
+/* ============ 预置常量（部署时替换） ============ */
+const URL_FALLBACK = "http://127.0.0.1:8899/frame.jpg";
+let DEFAULT_FRAME_URL = URL_FALLBACK, DEFAULT_RTSP = '';
+// 零位同帧标定 2026-11-06（板上连抓 8 组、5 组两路全检出，均值±SD）
+// 吊舱与双目各一套常量，基准点/scale 都按各自帧分辨率标定，绝不能共用
+let REF_X = 642.8, REF_Y = 361.4, SCALE = 1.19, calibrated = false, calibState = 0;        // 吊舱 1280×720  SD(0.5,1.6)px
+let ST_REF_X = 786.0, ST_REF_Y = 560.0, ST_SCALE = 0.8328, stCalibrated = false;            // 双目 1536×1280 零位_20261106_1203 八帧对角线交点均值 SD(0.77,0.73)px
+let frameSrc = 'pod';   // 当前标注帧来源：'pod' 吊舱 / 'stereo' 双目 -> 决定用哪套常量
+const POD_MM = false;   // 吊舱帧是否计算 dx/dy(mm)：默认关。吊舱在云台上，角度一转/变焦一变，REF+SCALE 同时失效
+                        // （实测零位同帧吊舱 −8/−8 vs 双目 20/−6）。要恢复：把云台锁到零位角度、变焦锁死，
+                        // 重跑零位同帧标定后把这里改 true，并同时校准 REF_X/REF_Y。
+let manualPending = null;   // 板端发来的人工标注请求(aruco/manual/request)，非空=处于人工补标模式
+
+// 进入人工补标模式（MQTT 直推 或 冷启动/热拉起自取，都走这里）
+function enterManualMode(o){
+  manualPending = o || {};
+  marks=[]; selected=-1; inlierIdx=[]; lastDx=lastDy=null;
+  frameSrc = 'stereo';
+  try{
+    document.getElementById('hint').textContent='自动校准失败('+((o&&o.reason)||'')+')：点「获取双目」抓帧，标满 4 孔后点「回传标注」';
+    setStat('自动校准失败，待人工标注','warn');
+    const btn=document.getElementById('calibrate');
+    if(btn){btn.textContent='📤 回传标注';btn.disabled=false;}
+  }catch(e){}
+  calibState=0;
+  draw();
+}
+// 从原生取走冷启动/热拉起时服务暂存的标注请求
+window.__takeManual=function(){
+  try{
+    if(window.G20 && G20.takePendingManualRequest){
+      const p=G20.takePendingManualRequest();
+      if(p) enterManualMode(JSON.parse(p));
+    }
+  }catch(e){}
+};
+
+/* ================= 画布标注 ================= */
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const box=document.getElementById('mainBox');
+const img=new Image(),off=document.createElement('canvas'),octx=off.getContext('2d');
+let marks=[],fitScale=1,selected=-1,inlierIdx=[],lastDx=null,lastDy=null;
+const ds=()=>fitScale,bx=()=>(cv.width-img.width*ds())/2,by=()=>(cv.height-img.height*ds())/2;
+const toImg=(x,y)=>({u:(x-bx())/ds(),v:(y-by())/ds()});
+function fit(){const mw=box.clientWidth,mh=box.clientHeight;
+  if(mw<=0||mh<=0){requestAnimationFrame(fit);return;}
+  cv.width=mw;cv.height=mh;fitScale=Math.min(mw/img.width,mh/img.height);draw()}
+function ring(x,y,r,c,lw){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.beginPath();ctx.arc(X,Y,r*d,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=lw;ctx.shadowColor=c;ctx.shadowBlur=7;ctx.stroke();ctx.restore()}
+function dot(x,y,c,s){const d=ds(),X=bx()+x*d,Y=by()+y*d;ctx.save();ctx.fillStyle=c;ctx.beginPath();ctx.arc(X,Y,s,0,Math.PI*2);ctx.shadowColor=c;ctx.shadowBlur=9;ctx.fill();ctx.restore()}
+function spinner(on){const el=document.getElementById('spinner');if(el)el.classList.toggle('show',!!on)}
+function draw(){if(!cv.width||!img.width)return;ctx.clearRect(0,0,cv.width,cv.height);
+  const d=ds();ctx.drawImage(off,bx(),by(),img.width*d,img.height*d);
+  marks.forEach((m,i)=>{const sel=i===selected;
+    const inl=inlierIdx.includes(i);
+    const col=sel?'#ffc400':(inl?'#22c55e':'#ff5d5d');
+    ring(m.cx,m.cy,m.r,col,sel?3.5:(inl?2.5:1.6));
+    dot(m.cx,m.cy,col,sel?7:(inl?4.5:3));
+    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText(String(i+1),bx()+m.cx*d+8,by()+m.cy*d-8)});
+}
+function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
+  if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
+img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');
+  const nm=frameSrc==='stereo'?'双目':'吊舱', want=frameSrc==='stereo'?[1536,1280]:[1280,720];
+  const cc=$('curCam'); if(cc) cc.textContent='当前帧：'+nm+' 标定口径 '+want[0]+'×'+want[1]+'，实际 '+img.width+'×'+img.height+(frameSrc==='stereo'?'':'（吊舱帧不出 mm）');
+  let h = frameSrc==='stereo'
+    ? '已取帧（双目），点「检测圆」或手动点孔标注；dx/dy 按零位基准 (786.0, 560.0)、scale 0.8328 算'
+    : '已取帧（吊舱），只用于看图/标注；吊舱在云台上，角度或变焦一变 mm 就不准，纠偏值统一看双目帧';
+  if(img.width!==want[0]||img.height!==want[1]) h+=' ⚠️ 帧尺寸与常量口径不符，scale/参考点需按 '+img.width+'×'+img.height+' 重标';
+  document.getElementById('hint').textContent=h;
+  recompute()};
+img.onerror=()=>{spinner(false);document.getElementById('hint').textContent='获取帧失败，检查抓帧服务';setStat('取帧失败','')};
+new ResizeObserver(fit).observe(box);
+cv.addEventListener('pointerdown',e=>{
+  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,{u,v}=toImg(px,py);
+  const hit=hitMarker(u,v);
+  if(hit>=0){selected=hit}
+  else{const s=snapImageData(octx.getImageData(0,0,off.width,off.height),u,v);
+    const cx=s?s.cx:u, cy=s?s.cy:v;
+    const dup=marks.find(m=>Math.hypot(m.cx-cx,m.cy-cy)<60);
+    if(dup){selected=marks.indexOf(dup)}
+    else{marks.push({cx,cy,r:s?s.r:30,snapped:!!s,auto:false});selected=marks.length-1}}
+  draw();recompute()});
+/* 选中圆后：方向键微调位置 + 放大/缩小圆 */
+function nudge(dx,dy){const m=marks[selected];if(!m)return;m.cx+=dx;m.cy+=dy;m.snapped=false;draw();recompute()}
+function resize(dr){const m=marks[selected];if(!m)return;m.r=Math.max(10,m.r+dr);draw()}
+function holdRepeat(btn,fn,interval=90){let timer=null,rep=null;
+  const stop=()=>{clearTimeout(timer);clearInterval(rep);timer=rep=null};
+  btn.addEventListener('pointerdown',e=>{e.preventDefault();fn();
+    timer=setTimeout(()=>{rep=setInterval(fn,interval)},220)});
+  btn.addEventListener('pointerup',stop);btn.addEventListener('pointerleave',stop);
+  btn.addEventListener('pointercancel',stop)}
+holdRepeat(document.getElementById('mvUp'),()=>nudge(0,-5));
+holdRepeat(document.getElementById('mvDown'),()=>nudge(0,5));
+holdRepeat(document.getElementById('mvLeft'),()=>nudge(-5,0));
+holdRepeat(document.getElementById('mvRight'),()=>nudge(5,0));
+holdRepeat(document.getElementById('shrink'),()=>resize(-4));
+holdRepeat(document.getElementById('enlarge'),()=>resize(4));
+
+/* ================= 获取帧（直接拉 URL，不选文件） ================= */
+function fetchFrame(){
+  frameSrc='pod';
+  // App 内：原生 libVLC 抓 RTSP 帧
+  if(DEFAULT_RTSP && window.G20 && window.G20.grabFrame){
+    spinner(true);setStat('取帧中…','busy');
+    window.G20.grabFrame(DEFAULT_RTSP);   // 原生抓完回调 loadCompareFrame(dataUrl)
+    return;
+  }
+  // 回退：HTTP 抓帧（浏览器调试）
+  const u=DEFAULT_FRAME_URL;
+  if(!u){document.getElementById('hint').textContent='未配置帧源';return}
+  spinner(true);setStat('取帧中…','busy');
+  img.src=u+(u.includes('?')?'&':'?')+'t='+Date.now();}
+function grabStereo(){
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(!mcfg || !mcfg.enabled || !mcfg.stereoGrab){
+    document.getElementById('hint').textContent='MQTT 未启用或未配置双目取帧';
+    return;
+  }
+  spinner(true);setStat('取双目中…','busy');
+  mqttPublish(mcfg.stereoGrab, JSON.stringify({cmd:"grab"}));
+}
+document.getElementById('fetchFrame').onclick=()=>fetchFrame();
+document.getElementById('grabStereo').onclick=()=>grabStereo();
+document.getElementById('detect').onclick=()=>autoDetect();
+document.getElementById('calibrate').onclick=()=>calibrate();
+document.getElementById('undo').onclick=()=>{marks.pop();if(selected>=marks.length)selected=-1;draw();recompute()};
+document.getElementById('clear').onclick=()=>{marks=[];selected=-1;draw();recompute()};
+
+/* ================= 结果计算 ================= */
+const $=id=>document.getElementById(id);
+function fmt(v,d){if(isNaN(v))return '—';const z=Math.pow(10,-d)/2;return (Math.abs(v)<z?0:v).toFixed(d)}   // 避免出现 "-0mm"
+function setStat(txt,cls){const p=$('pill');p.className='pill'+(cls?' '+cls:'');$('stat').textContent=txt}
+function recompute(){
+  setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
+  if(marks.length<3){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+    $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';$('vscenter').textContent='—';
+    inlierIdx=[];lastDx=lastDy=null;draw();return}
+  const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
+  const r=robustCentroid(mp);
+  if(!r){inlierIdx=[];lastDx=lastDy=null;draw();return}
+  inlierIdx=r.inliers;
+  // 帧尺寸还原：双目图板端按 max_side=1280 下发(1536×1280→1280×1066)，参考点/scale 是 1536×1280 口径
+  const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
+  const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
+  const cxN = r.cx*kx, cyN = r.cy*ky;
+  $('vscenter').textContent='('+cxN.toFixed(1)+', '+cyN.toFixed(1)+') px';
+  // 吊舱帧默认不出 mm：吊舱装在云台上，角度/变焦一变 REF 和 SCALE 就同时失效（实测零位同帧 −8/−8 vs 双目 20/−6）
+  if(frameSrc!=='stereo' && !POD_MM){
+    $('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
+    $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';
+    lastDx=lastDy=null; draw(); return;
+  }
+  // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
+  const RX = frameSrc==='stereo'?ST_REF_X:REF_X, RY = frameSrc==='stereo'?ST_REF_Y:REF_Y,
+        SC = frameSrc==='stereo'?ST_SCALE:SCALE;
+  const dx=(RX-cxN)*SC, dy=(RY-cyN)*SC;   // 简化：参考点 + 比例
+  lastDx=dx; lastDy=dy;
+  $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
+  $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
+  // 已校准后自动发布 dx/dy（只在双目帧上发，吊舱帧的 mm 不可信，绝不发）
+  if(calibrated && frameSrc==='stereo'){
+    const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+    if(mcfg && mcfg.enabled && mcfg.publish){
+      try{ mqttPublish(mcfg.publish, JSON.stringify({dx:+dx.toFixed(2), dy:+dy.toFixed(2)})); }catch(e){}
+    }
+  }
+  draw();
+}
+
+/* ================= 安卓 WebView 桥 ================= */
+window.loadCompareFrame=function(url){
+  if(!url){spinner(false);document.getElementById('hint').textContent='抓帧失败，检查 RTSP';setStat('取帧失败','');return}
+  spinner(true);setStat('取帧中…','busy');
+  img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
+};
+window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
+
+/* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
+function startMqttFromConfig(){
+  const m = (window.GIMBAL_CONFIG||{}).mqtt;
+  if(!m || !m.enabled) return;
+  if(window.G20 && window.G20.mqttStart){
+    const topics = [m.subscribe, m.calibStatus, m.stereoImage].filter(Boolean).join(',');
+    window.G20.mqttStart(m.broker||'', m.clientId||'g20', topics);
+  }
+}
+window.onMqttMessage = function(topic, payload){
+  try{ (window.__lastMsgAt = window.__lastMsgAt || {})[topic] = Date.now(); }catch(e){}
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  // 双目图返回（stereo/image，订阅收）
+  if(mcfg && mcfg.stereoImage && topic === mcfg.stereoImage){
+    try{
+      const o = JSON.parse(payload);
+      const img = o.img || o.image || o.data;
+      if(img){
+        const url = img.startsWith('data:') ? img : 'data:image/jpeg;base64,' + img;
+        frameSrc = 'stereo';
+        loadCompareFrame(url);
+      } else {
+        spinner(false); setStat('取双目失败','');
+        document.getElementById('hint').textContent='双目图返回为空';
+      }
+    }catch(e){
+      spinner(false); setStat('取双目失败','');
+      document.getElementById('hint').textContent='双目图解析失败';
+    }
+    return;
+  }
+  // 校准状态（aruco/calibrate/status，订阅收）
+  if(mcfg && mcfg.calibStatus && topic === mcfg.calibStatus){
+    try{
+      const o = JSON.parse(payload);
+      const names = ['未纠偏','纠偏中','纠偏完成'];
+      if(o.status!=null){
+        updateCalibButton(o.status);
+        if(o.status===2 || o.status===0) lockUI(false);   // 完成或未纠偏：解除全局锁定
+        document.getElementById('hint').textContent = '校准状态: ' + (names[o.status] || ('状态'+o.status));
+      }
+    }catch(e){}
+    return;
+  }
+  // 人工标注请求（自动校准失败，板端请求人工标注；用户自己「获取双目」抓帧来标）
+  if(mcfg && mcfg.manualReq && topic === mcfg.manualReq){
+    try{ enterManualMode(JSON.parse(payload)); }catch(e){}
+    return;
+  }
+  // 真值 dx/dy：支持逗号分隔的多个话题（gimbal/real_dxdy 或板端 aruco/detection）
+  {
+    const realTopics = String(mcfg && mcfg.subscribe || '').split(',').map(s=>s.trim()).filter(Boolean);
+    if(realTopics.indexOf(topic) >= 0){
+      let dx=null, dy=null, skipped=false;
+      try{
+        const o = JSON.parse(payload);
+        if(o.valid === 0 || o.valid === false) skipped = true;   // aruco/detection 无效帧
+        if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
+        else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
+      }catch(e){
+        const parts = payload.split(/[\s,]+/).map(Number);
+        if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
+      }
+      if(!skipped && dx!=null && dy!=null){
+        setRealDxdy(dx, dy);
+        document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+      }
+      return;
+    }
+  }
+};
+window.mqttPublish = function(topic, payload){
+  if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
+};
+/* 校准按钮状态：0=未纠偏(可点) 1=纠偏中(禁点) 2=纠偏完成 */
+function updateCalibButton(state){
+  calibState = state;
+  const btn = document.getElementById('calibrate');
+  if(!btn) return;
+  if(state === 1){ btn.textContent='⏳ 校准中...'; btn.disabled=true; }
+  else if(state === 2){ btn.textContent='✅ 已校准'; btn.disabled=false; }
+  else { btn.textContent='🎯 校准'; btn.disabled=false; }
+}
+/* 校准：记下当前四孔中心为参考点 + 发布 cmd=calibrate 到 aruco/stop 给板端 */
+function calibrate(){
+  if(calibState === 1){ document.getElementById('hint').textContent='校准中，请稍候'; return; }
+  // 人工补标模式：回传标注点（aruco/manual），不是发自动校准命令（aruco/stop）
+  if(manualPending){
+    if(inlierIdx.length < 4){
+      document.getElementById('hint').textContent='未标满 4 个孔，无法回传';
+      return;
+    }
+    // 坐标还原：双目帧被降采样到 1280 宽显示，板端要 1536×1280 原图坐标
+    const OW = 1536, OH = 1280;
+    const sx = img.width>0 ? OW/img.width : 1;
+    const sy = img.height>0 ? OH/img.height : 1;
+    const points = inlierIdx.map(i=>({
+      x: Math.round(marks[i].cx*sx*10)/10,
+      y: Math.round(marks[i].cy*sy*10)/10,
+      r: Math.round((marks[i].r||0)*sx)
+    }));
+    const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+    if(mcfg && mcfg.manualResp) mqttPublish(mcfg.manualResp, JSON.stringify({image_id: manualPending.image_id||'', points: points}));
+    document.getElementById('hint').textContent='已回传人工标注（'+points.length+' 孔）';
+    setStat('已回传人工标注','ok');
+    manualPending = null;
+    const btn=document.getElementById('calibrate');
+    if(btn){btn.textContent='🎯 校准';}
+    recompute();
+    return;
+  }
+  // 吊舱帧不出 mm(POD_MM=false)：不改吊舱基准（写了也没 mm 用它），但仍允许触发板端二次校准——
+  // 板端用的是它自己的深度相机值，不读吊舱帧，所以这条命令本身是安全的
+  const podNoMm = (frameSrc!=='stereo' && !POD_MM);
+  if(inlierIdx.length < 4){
+    document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
+    return;
+  }
+  if(!podNoMm && (lastDx == null || lastDy == null)){
+    document.getElementById('hint').textContent='dx/dy 未计算，请先标注四孔再校准';
+    return;
+  }
+  // 与 recompute 同口径：对角线交点(4点/3点)，再还原到标定分辨率(双目 1536×1280 / 吊舱 1280×720)
+  const rr = robustCentroid(inlierIdx.map(i=>({x:marks[i].cx,y:marks[i].cy})));
+  if(!rr){document.getElementById('hint').textContent='四孔退化，取不到中心';return}
+  const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
+  const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
+  const cx = rr.cx*kx, cy = rr.cy*ky;
+  // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存；吊舱帧不出 mm 就不写
+  if(!podNoMm){
+  if(frameSrc==='stereo'){ ST_REF_X=cx; ST_REF_Y=cy; stCalibrated=true;
+    try{ localStorage.setItem('stereo_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
+  else { REF_X=cx; REF_Y=cy; calibrated=true;
+    try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
+  }
+  if(frameSrc==='stereo'){
+    // 双目基准是 App 本地量，不通知板端、不锁 UI（板端 calibrate 会动平台，危险）
+    document.getElementById('hint').textContent='双目基准已就地保存 ('+cx.toFixed(1)+','+cy.toFixed(1)+') px —— 本地生效，未通知板端';
+    recompute(); return;
+  }
+  // 发送校准命令给板端（发布到 aruco/stop）
+  const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
+  updateCalibButton(1);  // 立即置「校准中」禁点
+  lockUIFor(60000, '⏳ 校准中，请稍候…');   // 校准期间全局锁定，收到完成/失败状态或 60s 超时解锁
+  document.getElementById('hint').textContent = podNoMm
+    ? '已触发板端二次校准（板端用自己的深度相机值；吊舱帧不出 mm，参考点未改）'
+    : '已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
+  recompute();
+}
+
+/* ================= 初始化 ================= */
+function applyConfig(){
+  const CFG = (typeof window!=='undefined' && window.GIMBAL_CONFIG) || {};
+  DEFAULT_FRAME_URL = CFG.frameUrl || URL_FALLBACK;
+  DEFAULT_RTSP = CFG.rtspUrl || '';
+  if(CFG.gimbalRefX!=null)REF_X=CFG.gimbalRefX;
+  if(CFG.gimbalRefY!=null)REF_Y=CFG.gimbalRefY;
+  if(CFG.scale!=null)SCALE=CFG.scale;
+  if(CFG.stereoRefX!=null)ST_REF_X=CFG.stereoRefX;
+  if(CFG.stereoRefY!=null)ST_REF_Y=CFG.stereoRefY;
+  if(CFG.stereoScale!=null)ST_SCALE=CFG.stereoScale;
+  // 恢复已保存的校准参考点（吊舱 / 双目 分开）
+  try{
+    const s=localStorage.getItem('gimbal_ref');
+    if(s){const o=JSON.parse(s);if(o.x!=null&&o.y!=null){REF_X=o.x;REF_Y=o.y;calibrated=true;}}
+    const t=localStorage.getItem('stereo_ref');
+    if(t){const o=JSON.parse(t);if(o.x!=null&&o.y!=null){ST_REF_X=o.x;ST_REF_Y=o.y;stCalibrated=true;}}
+  }catch(e){}
+  recompute();
+  try{ window.__takeManual && window.__takeManual(); }catch(e){}   // 冷启动：取走服务暂存的标注请求
+}
+/* 现场免重打包：HBuilder 运行时读 /sdcard/gimbal_config.json 覆盖内置配置 */
+function loadExternalConfig(){
+  if(typeof plus==='undefined'||!plus.io) return;
+  const paths=['/sdcard/gimbal_config.json','_doc/gimbal_config.json'];
+  let i=0;
+  (function tryNext(){
+    if(i>=paths.length) return;
+    const p=paths[i++];
+    plus.io.resolveLocalFileSystemURL(p, function(entry){
+      entry.file(function(file){
+        const r=new plus.io.FileReader();
+        r.onloadend=function(e){
+          try{
+            const ext=JSON.parse(e.target.result);
+            if(ext && typeof ext==='object'){
+              window.GIMBAL_CONFIG = Object.assign({}, window.GIMBAL_CONFIG||{}, ext);
+              applyConfig();
+            }
+          }catch(err){ /* 解析失败，沿用内置配置 */ }
+        };
+        r.readAsText(file, 'utf-8');
+      }, tryNext);
+    }, tryNext);
+  })();
+}
+/* ================= 设置页 ================= */
+const SETTINGS_KEY='gimbal_settings_v1';
+const SET_FIELDS=[
+  ['setBroker','mqtt.broker'],['setRtsp','rtspUrl'],['setScale','scale'],
+  ['setSub','mqtt.subscribe'],['setPub','mqtt.publish'],
+  ['setCalibCmd','mqtt.calibCmd'],['setCalibStatus','mqtt.calibStatus'],
+  ['setSgrab','mqtt.stereoGrab'],['setSimage','mqtt.stereoImage'],
+  ['setClientId','mqtt.clientId']
+];
+function cfgGet(path){ return path.split('.').reduce((o,k)=>(o==null?undefined:o[k]), window.GIMBAL_CONFIG||{}); }
+function cfgSet(path,v){ const ks=path.split('.'); let o=window.GIMBAL_CONFIG||(window.GIMBAL_CONFIG={});
+  for(let i=0;i<ks.length-1;i++){ o[ks[i]]=o[ks[i]]||{}; o=o[ks[i]]; } o[ks[ks.length-1]]=v; }
+function cfgMerge(base,over){ const out=Object.assign({},base||{});
+  Object.keys(over||{}).forEach(k=>{ const v=over[k];
+    if(v&&typeof v==='object'&&!Array.isArray(v)&&base&&typeof base[k]==='object') out[k]=cfgMerge(base[k],v);
+    else out[k]=v; });
+  return out; }
+function loadSettings(){
+  try{ const raw=localStorage.getItem(SETTINGS_KEY); if(!raw) return;
+    const o=JSON.parse(raw); if(o&&typeof o==='object') window.GIMBAL_CONFIG=cfgMerge(window.GIMBAL_CONFIG,o);
+  }catch(e){}
+}
+function openSettings(){
+  SET_FIELDS.forEach(([id,p])=>{ const el=document.getElementById(id); if(el) el.value=(cfgGet(p)!=null?cfgGet(p):''); });
+  const on=document.getElementById('setMqttOn'); if(on) on.checked=!!cfgGet('mqtt.enabled');
+  const ref=document.getElementById('setRef');
+  if(ref) ref.textContent='吊舱参考点 ('+Number(REF_X).toFixed(1)+', '+Number(REF_Y).toFixed(1)+')'+(calibrated?'（已校准）':'（默认）')+' · scale '+Number(SCALE).toFixed(3)+' mm/px';
+  const sr=document.getElementById('stRef');
+  if(sr) sr.textContent='双目参考点 ('+Number(ST_REF_X).toFixed(1)+', '+Number(ST_REF_Y).toFixed(1)+')'+(stCalibrated?'（已校准）':'（默认）')+' · scale '+Number(ST_SCALE).toFixed(3)+' mm/px';
+  const ps=document.getElementById('podScaleVal'); if(ps) ps.textContent=Number(SCALE).toFixed(3);
+  const sv=document.getElementById('stereoScaleVal'); if(sv) sv.textContent=Number(ST_SCALE).toFixed(3);
+  try{ refreshLiveConn(); }catch(e){}
+  document.getElementById('settingsMask').classList.add('show');
+}
+function closeSettings(){ document.getElementById('settingsMask').classList.remove('show'); }
+function saveSettings(){
+  SET_FIELDS.forEach(([id,p])=>{ const el=document.getElementById(id); if(!el) return;
+    let v=el.value.trim(); if(p==='scale') v=Number(v)||0; cfgSet(p,v); });
+  const on=document.getElementById('setMqttOn'); if(on) cfgSet('mqtt.enabled', !!on.checked);
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(window.GIMBAL_CONFIG)); }catch(e){}
+  applyConfig(); startMqttFromConfig(); closeSettings();
+  document.getElementById('hint').textContent='设置已保存并应用';
+}
+function resetSettings(){
+  if(!confirm('恢复出厂默认？当前设置会被清除。')) return;
+  try{ localStorage.removeItem(SETTINGS_KEY); }catch(e){}
+  location.reload();
+}
+function resetRefPoint(){
+  try{ localStorage.removeItem('gimbal_ref'); localStorage.removeItem('stereo_ref'); }catch(e){}
+  calibrated=false; stCalibrated=false;
+  const CFG=(window.GIMBAL_CONFIG||{});
+  if(CFG.gimbalRefX!=null)REF_X=CFG.gimbalRefX;
+  if(CFG.gimbalRefY!=null)REF_Y=CFG.gimbalRefY;
+  if(CFG.stereoRefX!=null)ST_REF_X=CFG.stereoRefX;
+  if(CFG.stereoRefY!=null)ST_REF_Y=CFG.stereoRefY;
+  recompute(); openSettings();
+}
+async function runSelfTest(){
+  const out=document.getElementById('stOut'); const lines=[];
+  const add=(name,st,detail)=>{ const ico=st===true?'✅':(st===false?'❌':'⚠️');
+    lines.push(ico+' '+name+(detail?('：'+detail):'')); out.textContent=lines.join('\n'); };
+  out.textContent='检查中…';
+  const lm=window.__lastMsgAt||{};
+  const broker=String(cfgGet('mqtt.broker')||'').trim();
+  const list=broker.split(',').map(s=>s.trim()).filter(Boolean);
+  const bad=list.filter(b=>!/^tcp:\/\/[^\s:,]+:\d+$/.test(b));
+  add('配置·broker 格式', (list.length>0&&bad.length===0), bad.length?('非法 '+bad.join(' ')):(list.length+' 个候选'));
+  const sc=Number(cfgGet('scale'));
+  add('配置·scale', sc>0.01&&sc<10, sc+' mm/px');
+  // 双相机常量 + mm 1:1 换算自检
+  const ssc=Number(cfgGet('stereoScale')), srx=Number(cfgGet('stereoRefX')), sry=Number(cfgGet('stereoRefY'));
+  add('双相机常量齐备', (sc>0.01&&sc<10&&ssc>0.01&&ssc<10&&srx>0&&sry>0),
+      '吊舱 ('+REF_X.toFixed(1)+','+REF_Y.toFixed(1)+')/'+sc+' · 双目 ('+srx+','+sry+')/'+ssc);
+  const tpx=Math.round(100/ssc);
+  add('换算·100mm→双目像素', tpx>40&&tpx<400, '±100mm ↔ ±'+tpx+'px（两路 mm 1:1，双目按 k_st='+ssc+' 折像素）');
+  const rtsp=String(cfgGet('rtspUrl')||'');
+  add('配置·RTSP 地址', /^rtsp:\/\//.test(rtsp), rtsp||'(空)');
+  let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+  add('MQTT 连接', conn, conn?'已连接':'未连接');
+  if(conn){
+    const imgTopic=cfgGet('mqtt.stereoImage')||'stereo/image';
+    const grabTopic=cfgGet('mqtt.stereoGrab')||'stereo/grab';
+    const before=lm[imgTopic]||0; const t0=Date.now();
+    mqttPublish(grabTopic, JSON.stringify({cmd:'grab'}));
+    let got=false;
+    for(let i=0;i<40&&!got;i++){ await new Promise(r=>setTimeout(r,200)); got=(lm[imgTopic]||0)>before; }
+    add('双目取帧往返', got, got?('耗时 '+(Date.now()-t0)+' ms'):'8 秒内未收到');
+    const now=Date.now();
+    const realT=String(cfgGet('mqtt.subscribe')||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const hitReal=realT.some(t=>now-(lm[t]||0)<10000);
+    add('真值话题近期数据', hitReal?'warn':hitReal, realT.join(' | ')||'(未配置)');
+    const csT=cfgGet('mqtt.calibStatus');
+    const hitCs=csT&&(now-(lm[csT]||0)<60000);
+    add('校准状态话题', hitCs?'warn':hitCs, csT||'(未配置)');
+  } else {
+    add('双目取帧往返', false, '未连接，跳过');
+  }
+  const hasImg=(typeof img!=='undefined')&&img&&img.width>0;
+  add('画面已加载图像', hasImg?'warn':hasImg, hasImg?(img.width+'×'+img.height):'未取帧');
+  let ls=false; try{ localStorage.setItem('__st','1'); localStorage.removeItem('__st'); ls=true; }catch(e){}
+  add('本地存储可用', ls);
+  const fail=lines.filter(l=>l.indexOf('❌')===0).length;
+  out.textContent=lines.concat(['', fail?('共 '+fail+' 项失败'):'全部通过']).join('\n');
+}
+/* ---- 探测结果回调 + 全局锁定 ---- */
+let __lockTimer=null;
+function lockUI(on,text){
+  const m=document.getElementById('lockMask'); if(!m) return;
+  if(on){ const t=document.getElementById('lockText'); if(text&&t) t.textContent=text; m.classList.add('show'); }
+  else { m.classList.remove('show'); clearTimeout(__lockTimer); __lockTimer=null; }
+}
+function lockUIFor(ms,text){
+  lockUI(true,text); clearTimeout(__lockTimer);
+  __lockTimer=setTimeout(()=>{ lockUI(false);
+    const h=document.getElementById('hint'); if(h) h.textContent='校准超时，已解锁'; }, ms);
+}
+function refreshLiveConn(){
+  const el=document.getElementById('setLiveConn'); if(!el) return;
+  let conn=false; try{ conn=!!(window.G20&&window.G20.mqttIsConnected&&window.G20.mqttIsConnected()); }catch(e){}
+  el.textContent='当前连接：'+(conn?'已连接':'未连接');
+  el.style.color=conn?'#22c55e':'#ff5d5d';
+}
+window.onMqttProbeResult=function(ok,msg){
+  const out=document.getElementById('setTestOut'); if(!out) return;
+  out.textContent=(ok?'✅ ':'❌ ')+(msg||'');
+  out.className=ok?'ok':'bad';
+  refreshLiveConn();
+};
+window.onRtspProbeResult=function(ok,msg){
+  const out=document.getElementById('setRtspOut'); if(!out) return;
+  out.textContent=(ok?'✅ ':'❌ ')+(msg||'');
+  out.className=ok?'ok':'bad';
+};
+(function bindSettings(){
+  const on=(id,ev,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener(ev,fn); };
+  on('btnSettings','click',openSettings);
+  on('setClose','click',closeSettings);
+  on('setSave','click',saveSettings);
+  on('setReset','click',resetSettings);
+  on('setResetRef','click',resetRefPoint);
+  on('setSelfTest','click',runSelfTest);
+  on('setTestBroker','click',()=>{
+    const el=document.getElementById('setBroker');
+    const val=(el?el.value:'').trim();
+    const out=document.getElementById('setTestOut');
+    if(!window.G20||!window.G20.mqttProbe){ out.className='bad'; out.textContent='当前包不支持测试'; return; }
+    if(!val){ out.className='bad'; out.textContent='请先填写 broker'; return; }
+    out.className=''; out.textContent='测试中…';
+    window.G20.mqttProbe(val);
+  });
+  on('setTestRtsp','click',()=>{
+    const el=document.getElementById('setRtsp');
+    const val=(el?el.value:'').trim();
+    const out=document.getElementById('setRtspOut');
+    if(!window.G20||!window.G20.rtspProbe){ out.className='bad'; out.textContent='当前包不支持测试'; return; }
+    if(!val){ out.className='bad'; out.textContent='请先填写地址'; return; }
+    out.className=''; out.textContent='测试中…';
+    window.G20.rtspProbe(val);
+  });
+  refreshLiveConn();
+})();
+loadSettings();
+applyConfig();
+startMqttFromConfig();
+recompute();
+/* POD_MM=false：吊舱帧不出 mm，隐藏「吊舱dx/dy」两格，避免常显 '—' 像坏了；改 true 自动恢复 */
+if(!POD_MM)['vgdx','vgdy'].forEach(id=>{const e=document.getElementById(id);if(e&&e.parentElement)e.parentElement.style.display='none'});
+loadExternalConfig();
+/* 提示条：内容变化时短暂显示 3.5s 后自动淡出，避免长时间压住画面 */
+(function(){
+  const h=document.getElementById('hint'); if(!h) return;
+  let t=null;
+  const kick=()=>{ h.classList.add('show'); clearTimeout(t); t=setTimeout(()=>h.classList.remove('show'),3500); };
+  new MutationObserver(kick).observe(h,{childList:true,characterData:true,subtree:true});
+  kick();
+})();
+</script>
+</body>
+</html>
