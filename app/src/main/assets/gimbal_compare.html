@@ -104,6 +104,8 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .res .note.truth b{color:var(--real)}
 .res .note.truth.stale b{color:var(--muted)}
 .res .note.truth b.bad{color:#ff6b6b}
+.res .note b.good{color:#22c55e}
+.res .note b.bad{color:#ff6b6b}
 #realNote{flex-wrap:wrap;row-gap:1px}
 #realNote>span:first-child{flex:0 0 auto;overflow:visible}
 #realNote .age{white-space:nowrap}
@@ -248,6 +250,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <button class="act primary" id="grabStereo">👁 获取双目</button>
     <button class="act" id="detect">⭕ 检测圆</button>
     <button class="act" id="calibrate">🎯 校准</button>
+    <button class="act" id="resetBtn" title="复位：发布 aruco/reset {cmd:reset}。空闲时板端不动平台、只回 aruco/reset/complete=1（10s）；只有二次校准过程中收到该指令才真做机械回中(约40s)。触发后按钮锁定，收到 complete=1 才解锁。">🏠 复位</button>
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
     <button class="act ghost" id="btnSettings" title="设置">⚙️</button>
@@ -280,6 +283,9 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div class="note"><span>板心</span><b id="vscenter">—</b><em class="age" id="vsdir">—</em></div>
       <div class="note truth" id="realNote" title="自动校准=板端「二次校准」回传的检测值（aruco/calibrate/status 里的 dx/dy，单位毫米；即遥控器点「校准」后板端在 gao.jpg/深度相机上量到的偏移）。状态 status=0 未校准 / 1 纠偏中 / 2 已完成；status=0 且带 reason 表示这次自动校准没成，需要手动校准。aruco/detection 是降落用的 30Hz 真值，与此行无关">
         <span>自动校准</span><b id="realval">—</b><em class="age" id="realage"></em>
+      </div>
+      <div class="note" id="resetNote" title="复位回执：板端 aruco/reset/complete。收到 status=1 表示已复位（板端持续 10 秒）；空闲时按复位不会让平台动，只回这个回执。">
+        <span>复位</span><b id="resetval">—</b><em class="age" id="resetage"></em>
       </div>
     </div>
     <div class="padwrap">
@@ -721,18 +727,113 @@ function renderReal(){
 }
 setInterval(renderReal, 500);
 
+/* ---------------- 复位 ---------------- */
+/* 用户 2026-11-13 确认的语义：发 aruco/reset {"cmd":"reset"}。
+   空闲时板端 run_reset_sequence() 不动平台，只在校准状态=2 时回 aruco/reset/complete=1；
+   真正机械回中只发生在二次校准过程中（校准线程消费该指令）。
+   交互：3 秒内点第二次才发；发出后按钮锁定为「⏳ 复位中」，收到 complete=1 才解锁可再点。 */
+let _resetArmTs = 0;
+const RESET_LOCK_MAX = 70;   // 兜底解锁秒数（板端不回执时不让按钮永久卡死）
+function resetBtnSet(txt, disabled){
+  const btn=document.getElementById('resetBtn');
+  if(!btn) return;
+  if(txt!=null) btn.textContent=txt;
+  if(disabled!=null) btn.disabled=disabled;
+}
+function setResetText(txt, cls){
+  const b=document.getElementById('resetval'), a=document.getElementById('resetage');
+  if(!b) return;
+  b.textContent = txt;
+  b.className = (cls||'');
+  if(a) a.textContent='';
+}
+function sendReset(){
+  const mcfg = (window.GIMBAL_CONFIG||{}).mqtt || {};
+  const topic = mcfg.resetCmd || 'aruco/reset';
+  window._resetSentTs = Date.now();
+  window._resetDoneTs = 0;
+  window._resetAcked = false;
+  window._resetLocked = true;
+  try{ mqttPublish(topic, JSON.stringify({cmd:'reset'})); }catch(e){}
+  setResetText('已发送 · 等回执');
+  resetBtnSet('⏳ 复位中', true);
+  const h=document.getElementById('hint'); if(h) h.textContent='已发复位指令到 '+topic+'，等 aruco/reset/complete=1 解锁';
+}
+function renderReset(){
+  const b=document.getElementById('resetval'), a=document.getElementById('resetage');
+  if(!b) return;
+  const now=Date.now();
+  const sent=window._resetSentTs||0, done=window._resetDoneTs||0;
+  if(!sent){ if(!b.textContent) setResetText('—'); return; }
+  if(done){
+    const age=(now-done)/1000;
+    b.textContent='完成'; b.className = age<12 ? 'good' : '';
+    if(a) a.textContent='· '+Math.floor(age)+'s 前回执';
+    return;
+  }
+  const wait=(now-sent)/1000;
+  txt_wait_guard(wait);
+  b.textContent = '已发送…'; b.className='';
+  if(a) a.textContent='· '+Math.floor(wait)+'s 未收回执'+(wait>60?'（板端仅在校准状态=2 才回执）':'');
+}
+function txt_wait_guard(wait){
+  // 兜底：超时解锁按钮，避免板端不回执时永久锁死
+  if(window._resetLocked && wait > RESET_LOCK_MAX){
+    window._resetLocked=false;
+    resetBtnSet('🏠 复位', false);
+  }
+  return false;
+}
+document.addEventListener('DOMContentLoaded', function(){
+  const btn=document.getElementById('resetBtn');
+  if(btn) btn.onclick=function(){
+    if(btn.disabled) return;
+    if(Date.now()-_resetArmTs > 3000){
+      _resetArmTs=Date.now();
+      setResetText('再点一次确认');
+      const h=document.getElementById('hint'); if(h) h.textContent='再点一次「复位」= 发送 aruco/reset（空闲时平台不会动）';
+      return;
+    }
+    _resetArmTs=0;
+    sendReset();
+  };
+  setInterval(renderReset, 500);
+});
+
 /* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
 function startMqttFromConfig(){
   const m = (window.GIMBAL_CONFIG||{}).mqtt;
   if(!m || !m.enabled) return;
   if(window.G20 && window.G20.mqttStart){
-    const topics = [m.subscribe, m.calibStatus, m.stereoImage].filter(Boolean).join(',');
+    const topics = [m.subscribe, m.calibStatus, m.stereoImage, m.resetComplete].filter(Boolean).join(',');
     window.G20.mqttStart(m.broker||'', m.clientId||'g20', topics);
   }
 }
 window.onMqttMessage = function(topic, payload){
   try{ (window.__lastMsgAt = window.__lastMsgAt || {})[topic] = Date.now(); }catch(e){}
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
+  // 复位回执（aruco/reset/complete，订阅收 {"status":0/1}）
+  if(mcfg && mcfg.resetComplete && topic === mcfg.resetComplete){
+    try{
+      const o = JSON.parse(payload);
+      const st = (o.status!=null) ? +o.status : (+payload||0);
+      window._resetRecvTs = Date.now();
+      if(st === 1){
+        window._resetDoneTs = Date.now();
+        window._resetAcked = true;
+        window._resetLocked = false;
+        const btn=document.getElementById('resetBtn');
+        if(btn){ btn.disabled=false; btn.textContent='🏠 复位'; }
+      }
+    }catch(e){
+      if(String(payload).trim()==='1'){
+        window._resetDoneTs=Date.now(); window._resetAcked=true; window._resetLocked=false;
+        const btn=document.getElementById('resetBtn');
+        if(btn){ btn.disabled=false; btn.textContent='🏠 复位'; }
+      }
+    }
+    return;
+  }
   // 双目图返回（stereo/image，订阅收）
   if(mcfg && mcfg.stereoImage && topic === mcfg.stereoImage){
     try{
