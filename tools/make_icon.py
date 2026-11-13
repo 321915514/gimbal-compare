@@ -9,7 +9,8 @@
 import os
 from PIL import Image
 
-SRC = r"C:\Users\Qi\Downloads\icon_1105\icon_1105\icon_1_192.png"
+# 默认绿底原图；换底色时用 ICON_SRC 指向另一张同图案的图（如 tools/icon_blue_192.png）
+SRC = os.environ.get("ICON_SRC", r"C:\Users\Qi\Downloads\icon_1105\icon_1105\icon_1_192.png")
 ROOT = r"C:\Users\Qi\gimbal-compare\app\src\main\res"
 DENS = [("ldpi", 0.75), ("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi", 3.0), ("xxxhdpi", 4.0)]
 
