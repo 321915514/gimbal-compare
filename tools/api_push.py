@@ -79,8 +79,11 @@ def changed_files(sha):
 def main():
     remote_head = api("GET", "/repos/%s/git/ref/heads/main" % REPO)["object"]["sha"]
     print("远端 main =", remote_head)
-    ahead = sh(["git", "rev-list", "--reverse", "%s..HEAD" % remote_head]).split()
-    print("待重放 commit 数 =", len(ahead))
+    # 远端 commit 是 API 重放出来的、本地仓库里没有对象，直接用 remote_head 做 rev-list 会报
+    # "Invalid revision range"；可传一个本地基准：python tools/api_push.py 7dd83c3
+    base = sys.argv[1] if len(sys.argv) > 1 else remote_head
+    ahead = sh(["git", "rev-list", "--reverse", "%s..HEAD" % base]).split()
+    print("基准 =", base, " 待重放 commit 数 =", len(ahead))
     if not ahead:
         print("本地不领先远端，无需推送"); return
 
