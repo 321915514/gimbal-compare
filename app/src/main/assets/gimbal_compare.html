@@ -103,10 +103,6 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .res .note b{color:#b9c8e4;font-weight:600;font-family:Consolas,monospace}
 .res .note.truth b{color:var(--real)}
 .res .note.truth.stale b{color:var(--muted)}
-.res .note.truth b.bad{color:#ff6b6b}
-#realNote{flex-wrap:wrap;row-gap:1px}
-#realNote>span:first-child{flex:0 0 auto;overflow:visible}
-#realNote .age{white-space:nowrap}
 .res .note .age{font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
 .res .note>span:first-child{flex:1;min-width:0}
 .side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
@@ -277,9 +273,13 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
         <div class="cell real"><div class="lbl">水平 dx</div><div class="val real" id="vsdx">—<small>mm</small></div></div>
         <div class="cell real"><div class="lbl">垂直 dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
       </div>
-      <div class="note"><span>板心</span><b id="vscenter">—</b><em class="age" id="vsdir">—</em></div>
-      <div class="note truth" id="realNote" title="自动校准=板端「二次校准」回传的检测值（aruco/calibrate/status 里的 dx/dy，单位毫米；即遥控器点「校准」后板端在 gao.jpg/深度相机上量到的偏移）。状态 status=0 未校准 / 1 纠偏中 / 2 已完成；status=0 且带 reason 表示这次自动校准没成，需要手动校准。aruco/detection 是降落用的 30Hz 真值，与此行无关">
-        <span>自动校准</span><b id="realval">—</b><em class="age" id="realage"></em>
+      <div class="sumline">
+        <span>合位移</span><b id="vstot">—</b><span class="u">mm</span>
+        <span class="dir" id="vsdir">—</span>
+      </div>
+      <div class="note"><span>板心</span><b id="vscenter">—</b></div>
+      <div class="note truth" id="realNote" title="板端 aruco/detection 原值单位是米(dx=纵向、dy=横向)，此处×1000显示成mm；板端只发分档值 0.01 / ±0.0555 / ±0.15，所以同一档内数值不变，属正常">
+        <span>真值</span><b id="realval">—</b><em class="age" id="realage"></em>
       </div>
     </div>
     <div class="padwrap">
@@ -639,11 +639,11 @@ function recompute(){
   setStat(img.width?('已标 '+marks.length+'/4 孔'):'未取帧', img.width?'ok':'');
   if(marks.length<3){$('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';$('vscenter').textContent='—';
-    setT('vsdir','—');
+    setT('vstot','—');setT('vsdir','—');
     inlierIdx=[];lastDx=lastDy=null;draw();return}
   const mp=marks.map(m=>({x:m.cx,y:m.cy}));   // 直接图像坐标，不用 H
   const r=robustCentroid(mp);
-  if(!r){inlierIdx=[];lastDx=lastDy=null;setT('vsdir','孔位退化');draw();return}
+  if(!r){inlierIdx=[];lastDx=lastDy=null;setT('vstot','—');setT('vsdir','孔位退化');draw();return}
   inlierIdx=r.inliers;
   // 帧尺寸还原：双目图板端按 max_side=1280 下发(1536×1280→1280×1066)，参考点/scale 是 1536×1280 口径
   const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
@@ -654,7 +654,7 @@ function recompute(){
   if(frameSrc!=='stereo' && !POD_MM){
     $('vgdx').innerHTML='—<small>mm</small>';$('vgdy').innerHTML='—<small>mm</small>';
     $('vsdx').innerHTML='—<small>mm</small>';$('vsdy').innerHTML='—<small>mm</small>';
-    setT('vsdir','像素可看');
+    setT('vstot','—');setT('vsdir','吊舱帧不出 mm');
     lastDx=lastDy=null; draw(); return;
   }
   // 按当前帧来源选常量；毫米层面两路 1:1，所以双目的 dx/dy 等于吊舱的 dx/dy
@@ -663,6 +663,7 @@ function recompute(){
   const dx=(RX-cxN)*SC, dy=(RY-cyN)*SC;   // 简化：参考点 + 比例
   lastDx=dx; lastDy=dy;
   const tot=Math.hypot(dx,dy);
+  setT('vstot',fmt(tot,1));
   setT('vsdir','参与 '+(inlierIdx.length||marks.length)+'/4');
   $('vgdx').innerHTML=fmt(dx,0)+'<small>mm</small>';$('vgdy').innerHTML=fmt(dy,0)+'<small>mm</small>';
   $('vsdx').innerHTML=fmt(dx,1)+'<small>mm</small>';$('vsdy').innerHTML=fmt(dy,1)+'<small>mm</small>';
@@ -682,42 +683,19 @@ window.loadCompareFrame=function(url){
   spinner(true);setStat('取帧中…','busy');
   img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
 };
-window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy;window._realTs=Date.now();window._lastValidTs=Date.now()};
+window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy;window._realTs=Date.now()};
 /* 真值行：板端 aruco/detection 的 dx/dy 单位是米，这里×1000 显示成 mm；
    板端只发分档值 0.01 / ±0.0555(0.05×1.11) / ±0.15，同一档内不变属正常；
    >1.5s 没收到有效帧则标灰并显示停留时长（原来直接写底部提示条，30Hz 会把其它提示糊掉） */
-/* 自动校准行（0266-11-13）：板端 aruco/detection 在 30Hz 上每个 tick 都会发，
-   没新检测结果时 valid=false，所以不能看单帧 valid 就报错。按时间窗口判断：
-   · 3s 内有 valid=true  → 正常显示 dx/dy
-   · 有消息但 3s 内没 valid=true → 自动校准失败，需手动
-   · 3s 内没任何消息        → 板端失联（不是算法失败） */
 function renderReal(){
   const b=document.getElementById('realval'), a=document.getElementById('realage'), n=document.getElementById('realNote');
   if(!b||!n) return;
-  const now=Date.now();
-  const calibAge = window._calibTs ? (now-window._calibTs)/1000 : 999;
-  const st = window._calibStatus;
-  const hasXY = (window._calibDx!=null && window._calibDy!=null);
-  const valTxt = hasXY ? ('dx '+window._calibDx+'  dy '+window._calibDy+' mm') : '';
-  b.classList.remove('bad'); n.classList.remove('stale');
-  // 板端回 status=0 + reason → 这次自动校准没成，提示手动（保持 2 分钟，不被 1Hz 的裸 status=0 冲掉）
-  if(window._calibFailTs && (now-window._calibFailTs)/1000 < 120 && st===0){
-    b.textContent = '失败·需手动校准'; b.classList.add('bad');
-    if(a) a.textContent = '· '+(window._calibReason||'未识别到孔位');
-    n.title='板端二次校准返回 status=0：'+(window._calibReason||'未识别到孔位')
-          +'。可重新点「校准」或手动移动后重新标孔。详情看📜面板';
-    return;
-  }
-  if(calibAge > 5){
-    b.textContent = hasXY ? valTxt : '—';
-    if(a) a.textContent = '板端无校准状态';
-    if(hasXY) n.classList.add('stale');
-    return;
-  }
-  if(st===2){ b.textContent = valTxt||'已完成'; if(a) a.textContent='· 已完成'; return; }
-  if(st===1){ b.textContent = valTxt||'纠偏中'; if(a) a.textContent='· 纠偏中'; return; }
-  b.textContent = '未校准';
-  if(a) a.textContent = hasXY ? ('· 上次 '+valTxt) : '';
+  if(window._realDx==null || window._realDy==null){ b.textContent='—'; if(a)a.textContent=''; n.classList.remove('stale'); return; }
+  const age = window._realTs ? (Date.now()-window._realTs)/1000 : 999;
+  const stale = age > 1.5;
+  b.textContent = 'dx '+(window._realDx*1000).toFixed(1)+'  dy '+(window._realDy*1000).toFixed(1)+' mm';
+  if(a) a.textContent = stale ? (age>3600 ? '· 失联' : '· '+age.toFixed(age<10?1:0)+'s 未更新') : '· 实时';
+  n.classList.toggle('stale', stale);
 }
 setInterval(renderReal, 500);
 
@@ -756,14 +734,6 @@ window.onMqttMessage = function(topic, payload){
   if(mcfg && mcfg.calibStatus && topic === mcfg.calibStatus){
     try{
       const o = JSON.parse(payload);
-      // 二次校准回传（2026-11-13）：板端 aruco/calibrate/status 带 dx/dy(毫米)/reason。
-      // 这是「自动校准检测到的偏移」的唯一来源；aruco/detection 是降落用的，不再驱动本行。
-      window._calibTs = Date.now();
-      if(o.dx!=null && o.dy!=null){ window._calibDx=Number(o.dx); window._calibDy=Number(o.dy); }
-      if(o.reason){ window._calibReason=String(o.reason); }
-      if(o.status===0 && o.reason){ window._calibFailTs=Date.now(); }
-      if(o.status===1 || o.status===2){ window._calibFailTs=0; window._calibReason=''; }
-      if(o.status!=null) window._calibStatus = o.status;
       const names = ['未纠偏','纠偏中','纠偏完成'];
       if(o.status!=null){
         updateCalibButton(o.status);
@@ -785,16 +755,15 @@ window.onMqttMessage = function(topic, payload){
       let dx=null, dy=null, skipped=false;
       try{
         const o = JSON.parse(payload);
-        if(o.valid === 0 || o.valid === false) skipped = true;   // 无新检测结果（不等于失败，按 3s 窗口判）
+        if(o.valid === 0 || o.valid === false) skipped = true;   // aruco/detection 无效帧
         if(o.dx!=null && o.dy!=null){dx=o.dx;dy=o.dy}
         else if(Array.isArray(o) && o.length>=2){dx=Number(o[0]);dy=Number(o[1])}
       }catch(e){
         const parts = payload.split(/[\s,]+/).map(Number);
         if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
       }
-      // aruco/detection 是降落用的 30Hz 真值，不再驱动「自动校准」行
-      // （用户 2026-11-13 澄清：二次校准走 aruco/stop→aruco/calibrate/status）
-      if(false){   // 只更新「真值(板端)」行，不再占用底部提示条
+      if(!skipped && dx!=null && dy!=null){
+        setRealDxdy(dx, dy);   // 只更新「真值(板端)」行，不再占用底部提示条
       }
       return;
     }
