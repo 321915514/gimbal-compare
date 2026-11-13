@@ -788,6 +788,7 @@ document.addEventListener('DOMContentLoaded', function(){
   const btn=document.getElementById('resetBtn');
   if(btn) btn.onclick=function(){
     if(btn.disabled) return;
+    if(window._calibStatus !== 2){ setResetText('未校准完成，不能复位'); return; }
     if(Date.now()-_resetArmTs > 3000){
       _resetArmTs=Date.now();
       setResetText('再点一次确认');
@@ -797,7 +798,8 @@ document.addEventListener('DOMContentLoaded', function(){
     _resetArmTs=0;
     sendReset();
   };
-  setInterval(renderReset, 500);
+  updateResetGate();
+  setInterval(function(){ renderReset(); }, 500);
 });
 
 /* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
@@ -823,13 +825,15 @@ window.onMqttMessage = function(topic, payload){
         window._resetAcked = true;
         window._resetLocked = false;
         const btn=document.getElementById('resetBtn');
-        if(btn){ btn.disabled=false; btn.textContent='🏠 复位'; }
+        if(btn){ btn.textContent='🏠 复位'; }
+        updateResetGate();
       }
     }catch(e){
       if(String(payload).trim()==='1'){
         window._resetDoneTs=Date.now(); window._resetAcked=true; window._resetLocked=false;
         const btn=document.getElementById('resetBtn');
-        if(btn){ btn.disabled=false; btn.textContent='🏠 复位'; }
+        if(btn){ btn.textContent='🏠 复位'; }
+        updateResetGate();
       }
     }
     return;
@@ -904,9 +908,23 @@ window.onMqttMessage = function(topic, payload){
 window.mqttPublish = function(topic, payload){
   if(window.G20 && window.G20.mqttPublish) window.G20.mqttPublish(topic, payload);
 };
+/* 复位按钮门控（用户 2026-11-13）：只有收到「校准完成」(calibrate/status=2) 才能点复位；
+   板端 run_reset_sequence() 也只在状态=2 时回 aruco/reset/complete=1，两边语义对齐。 */
+function updateResetGate(){
+  const btn=document.getElementById('resetBtn');
+  if(!btn) return;
+  if(window._resetLocked){ btn.disabled=true; return; }
+  const ok = (window._calibStatus === 2);
+  btn.disabled = !ok;
+  btn.title = ok
+    ? '复位：发布 aruco/reset {"cmd":"reset"}（空闲时板端不动平台，只回 aruco/reset/complete=1）'
+    : '校准完成(calibrate/status=2)后才能点复位';
+}
 /* 校准按钮状态：0=未纠偏(可点) 1=纠偏中(禁点) 2=纠偏完成 */
 function updateCalibButton(state){
   calibState = state;
+  window._calibStatus = state;
+  updateResetGate();
   const btn = document.getElementById('calibrate');
   if(!btn) return;
   if(state === 1){ btn.textContent='⏳ 校准中...'; btn.disabled=true; }
