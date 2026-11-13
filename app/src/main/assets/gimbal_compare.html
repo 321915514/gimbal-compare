@@ -691,25 +691,30 @@ window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy;window._r
 function renderReal(){
   const b=document.getElementById('realval'), a=document.getElementById('realage'), n=document.getElementById('realNote');
   if(!b||!n) return;
-  const msgAge = window._msgTs ? (Date.now()-window._msgTs)/1000 : 999;
-  const vAge = window._lastValidTs ? (Date.now()-window._lastValidTs)/1000 : 999;
+  const now=Date.now();
+  const calibAge = window._calibTs ? (now-window._calibTs)/1000 : 999;
+  const st = window._calibStatus;
+  const hasXY = (window._calibDx!=null && window._calibDy!=null);
+  const valTxt = hasXY ? ('dx '+window._calibDx+'  dy '+window._calibDy+' mm') : '';
   b.classList.remove('bad'); n.classList.remove('stale');
-  if(msgAge > 3){
-    b.textContent = window._realDx==null ? '—' : '失联 '+(msgAge>3600?'>1h':msgAge.toFixed(0)+'s');
-    if(a) a.textContent = window._realDx==null ? '' : '板端未上报';
-    if(window._realDx!=null) n.classList.add('stale');
-    return;
-  }
-  if(vAge > 3){
+  // 板端回 status=0 + reason → 这次自动校准没成，提示手动（保持 2 分钟，不被 1Hz 的裸 status=0 冲掉）
+  if(window._calibFailTs && (now-window._calibFailTs)/1000 < 120 && st===0){
     b.textContent = '失败·需手动校准'; b.classList.add('bad');
-    const ageTxt = !window._lastValidTs ? '一直未识别'
-                 : (vAge < 60 ? vAge.toFixed(0)+'s 未识别' : Math.round(vAge/60)+'min 未识别');
-    if(a) a.textContent = '· '+ageTxt;
-    n.title='已'+ageTxt+'（板端一直在发 valid=false，通常=没检出板框/孔位不足），需要手动标孔校准。详细原因看📜面板';
+    if(a) a.textContent = '· '+(window._calibReason||'未识别到孔位');
+    n.title='板端二次校准返回 status=0：'+(window._calibReason||'未识别到孔位')
+          +'。可重新点「校准」或手动移动后重新标孔。详情看📜面板';
     return;
   }
-  b.textContent = 'dx '+(window._realDx*1000).toFixed(1)+'  dy '+(window._realDy*1000).toFixed(1);
-  if(a) a.textContent = '· 实时';
+  if(calibAge > 5){
+    b.textContent = hasXY ? valTxt : '—';
+    if(a) a.textContent = '板端无校准状态';
+    if(hasXY) n.classList.add('stale');
+    return;
+  }
+  if(st===2){ b.textContent = valTxt||'已完成'; if(a) a.textContent='· 已完成'; return; }
+  if(st===1){ b.textContent = valTxt||'纠偏中'; if(a) a.textContent='· 纠偏中'; return; }
+  b.textContent = '未校准';
+  if(a) a.textContent = hasXY ? ('· 上次 '+valTxt) : '';
 }
 setInterval(renderReal, 500);
 
@@ -748,6 +753,14 @@ window.onMqttMessage = function(topic, payload){
   if(mcfg && mcfg.calibStatus && topic === mcfg.calibStatus){
     try{
       const o = JSON.parse(payload);
+      // 二次校准回传（2026-11-13）：板端 aruco/calibrate/status 带 dx/dy(毫米)/reason。
+      // 这是「自动校准检测到的偏移」的唯一来源；aruco/detection 是降落用的，不再驱动本行。
+      window._calibTs = Date.now();
+      if(o.dx!=null && o.dy!=null){ window._calibDx=Number(o.dx); window._calibDy=Number(o.dy); }
+      if(o.reason){ window._calibReason=String(o.reason); }
+      if(o.status===0 && o.reason){ window._calibFailTs=Date.now(); }
+      if(o.status===1 || o.status===2){ window._calibFailTs=0; window._calibReason=''; }
+      if(o.status!=null) window._calibStatus = o.status;
       const names = ['未纠偏','纠偏中','纠偏完成'];
       if(o.status!=null){
         updateCalibButton(o.status);
@@ -766,7 +779,6 @@ window.onMqttMessage = function(topic, payload){
   {
     const realTopics = String(mcfg && mcfg.subscribe || '').split(',').map(s=>s.trim()).filter(Boolean);
     if(realTopics.indexOf(topic) >= 0){
-      window._msgTs = Date.now();   // 自动校准行用：只要板端还在发就不算失联
       let dx=null, dy=null, skipped=false;
       try{
         const o = JSON.parse(payload);
@@ -777,8 +789,9 @@ window.onMqttMessage = function(topic, payload){
         const parts = payload.split(/[\s,]+/).map(Number);
         if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
       }
-      if(!skipped && dx!=null && dy!=null){
-        setRealDxdy(dx, dy);   // 只更新「真值(板端)」行，不再占用底部提示条
+      // aruco/detection 是降落用的 30Hz 真值，不再驱动「自动校准」行
+      // （用户 2026-11-13 澄清：二次校准走 aruco/stop→aruco/calibrate/status）
+      if(false){   // 只更新「真值(板端)」行，不再占用底部提示条
       }
       return;
     }
