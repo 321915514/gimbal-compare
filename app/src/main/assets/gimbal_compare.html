@@ -702,8 +702,10 @@ function renderReal(){
   }
   if(vAge > 3){
     b.textContent = '失败·需手动校准'; b.classList.add('bad');
-    if(a) a.textContent = '· '+vAge.toFixed(0)+'s 未识别';
-    n.title='连续 '+vAge.toFixed(0)+'s 没有有效检测（板端一直在发 valid=false），需要手动标孔校准';
+    const ageTxt = !window._lastValidTs ? '一直未识别'
+                 : (vAge < 60 ? vAge.toFixed(0)+'s 未识别' : Math.round(vAge/60)+'min 未识别');
+    if(a) a.textContent = '· '+ageTxt;
+    n.title='已'+ageTxt+'（板端一直在发 valid=false，通常=没检出板框/孔位不足），需要手动标孔校准。详细原因看📜面板';
     return;
   }
   b.textContent = 'dx '+(window._realDx*1000).toFixed(1)+'  dy '+(window._realDy*1000).toFixed(1);
