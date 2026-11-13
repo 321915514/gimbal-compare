@@ -104,6 +104,9 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .res .note.truth b{color:var(--real)}
 .res .note.truth.stale b{color:var(--muted)}
 .res .note.truth b.bad{color:#ff6b6b}
+#realNote{flex-wrap:wrap;row-gap:1px}
+#realNote>span:first-child{flex:0 0 auto;overflow:visible}
+#realNote .age{white-space:nowrap}
 .res .note .age{font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
 .res .note>span:first-child{flex:1;min-width:0}
 .side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
@@ -275,7 +278,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
         <div class="cell real"><div class="lbl">垂直 dy</div><div class="val real" id="vsdy">—<small>mm</small></div></div>
       </div>
       <div class="note"><span>板心</span><b id="vscenter">—</b><em class="age" id="vsdir">—</em></div>
-      <div class="note truth" id="realNote" title="自动校准=板端 aruco/detection 发布的 dx/dy（原值单位米，此处×1000显示mm，dx=纵向、dy=横向）。板端只发分档值 0.01 / ±0.0555 / ±0.15，同一档内数值不变属正常；连续 3s 收不到有效值则显示“自动校准失败·需手动校准”">
+      <div class="note truth" id="realNote" title="自动校准=板端「二次校准」回传的检测值（aruco/calibrate/status 里的 dx/dy，单位毫米；即遥控器点「校准」后板端在 gao.jpg/深度相机上量到的偏移）。状态 status=0 未校准 / 1 纠偏中 / 2 已完成；status=0 且带 reason 表示这次自动校准没成，需要手动校准。aruco/detection 是降落用的 30Hz 真值，与此行无关">
         <span>自动校准</span><b id="realval">—</b><em class="age" id="realage"></em>
       </div>
     </div>
