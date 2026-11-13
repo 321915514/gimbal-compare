@@ -86,21 +86,24 @@ textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px rgba
 .cmp .val.ok{color:var(--ok)} .cmp .val.bad{color:var(--danger)} .cmp .val.real{color:var(--real)}
 /* 结果区：dx/dy 两块大数 + 合位移；吊舱两格在 POD_MM=false 时由 JS 隐藏 */
 .cmp.one{grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.cmp.one .cell{padding:7px 11px;border-radius:12px}
+.cmp.one .cell{padding:6px 10px;border-radius:12px}
 .cmp.one .lbl{font-size:10.5px;letter-spacing:.6px;color:var(--muted)}
-.cmp.one .val{font-size:21px;line-height:1.15;margin-top:2px;letter-spacing:-.5px}
+.cmp.one .val{font-size:20px;line-height:1.15;margin-top:2px;letter-spacing:-.5px}
 .cmp.one .val small{display:inline;font-size:10.5px;margin-left:3px;opacity:.7}
 .res{flex:0 1 auto;min-height:0;overflow:hidden}
-.sumline{display:flex;align-items:baseline;gap:5px;margin-top:8px;font-size:11px;color:var(--muted);
-  background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:6px 10px}
+.sumline{display:flex;align-items:baseline;gap:5px;margin-top:6px;font-size:11px;color:var(--muted);
+  background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:4px 9px}
 .sumline b{font-size:15px;color:var(--fg);font-family:Consolas,monospace;font-variant-numeric:tabular-nums}
 .sumline .u{font-size:10px;opacity:.65}
 .sumline .dir{margin-left:auto;color:var(--muted);font-size:9.5px;border:1px solid var(--border);
   border-radius:999px;padding:1px 7px;white-space:nowrap}
-.res .note{display:flex;gap:6px;align-items:baseline;font-size:10.5px;color:var(--muted);
-  margin-top:7px;line-height:1.45;white-space:nowrap;overflow:hidden}
+.res .note{display:flex;gap:6px;align-items:baseline;font-size:10px;color:var(--muted);
+  margin-top:4px;white-space:nowrap;overflow:hidden}
 .res .note>span{overflow:hidden;text-overflow:ellipsis}
 .res .note b{color:#b9c8e4;font-weight:600;font-family:Consolas,monospace}
+.res .note.truth b{color:var(--real)}
+.res .note.truth.stale b{color:var(--muted)}
+.res .note .age{font-style:normal;font-size:10px;color:var(--muted);white-space:nowrap}
 .res .note>span:first-child{flex:1;min-width:0}
 .side .panel .dpad,.side .panel .sizepad{flex:0 0 auto}
 .side .panel .padwrap{flex:0 0 auto}
@@ -136,6 +139,9 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .logo{animation:logoGlow 3s ease-in-out infinite alternate}
 @keyframes logoGlow{from{box-shadow:0 0 10px rgba(79,140,255,.4)}to{box-shadow:0 0 20px rgba(124,92,255,.65)}}
 /* 加载转圈 */
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:13px;letter-spacing:.5px;pointer-events:none;transition:opacity .2s}
+.ph.hide{opacity:0}
 .spinner{position:absolute;top:50%;left:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
   border:4px solid rgba(79,140,255,.18);border-top-color:var(--accent);border-radius:50%;
   animation:spin .8s linear infinite;display:none;pointer-events:none;z-index:6}
@@ -173,18 +179,18 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 #lockMask .box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
   padding:16px 28px;font-size:14px;font-weight:700;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 /* 十字方向键（小按钮） + 圆大小按钮 */
-.padwrap{margin-top:auto;border-top:1px solid var(--border);padding-top:6px}
-.padtip{font-size:10px;color:var(--muted);text-align:center;margin-bottom:4px;letter-spacing:.6px}
+.padwrap{margin-top:auto;border-top:1px solid var(--border);padding-top:5px}
+.padtip{display:none}
 .padrow{display:flex;gap:7px;align-items:center;justify-content:center}
-.dpad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);
+.dpad{display:grid;grid-template-columns:repeat(3,38px);grid-template-rows:repeat(3,38px);
   grid-template-areas:". up ." "left . right" ". down .";gap:4px;justify-content:center}
 .dpad .nav{height:40px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--fg);font-size:20px;font-weight:700;cursor:pointer;transition:.14s;padding:0;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .dpad .nav:active{transform:scale(.88);background:var(--panel)}
 #mvUp{grid-area:up}#mvLeft{grid-area:left}#mvRight{grid-area:right}#mvDown{grid-area:down}
-.sizepad{display:flex;flex-direction:column;gap:6px;width:62px}
-.sizepad .nav{height:57px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
+.sizepad{display:flex;flex-direction:column;gap:5px;width:56px}
+.sizepad .nav{height:56px;border-radius:9px;border:1px solid var(--border);background:var(--panel2);
   color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.14s;
   touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .sizepad .nav:active{transform:scale(.94);background:var(--panel)}
@@ -222,6 +228,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
   <div class="body">
     <div class="main" id="mainBox">
       <canvas id="cv"></canvas>
+      <div class="ph" id="ph">点「获取双目」取一帧双目画面</div>
       <div class="spinner" id="spinner"></div>
       <div class="hintbar" id="hint">点「获取双目」拉取板端双目帧；点「检测圆」自动找孔，或点图手动标孔（自动吸附），选中圆后按钮微调</div>
     </div>
@@ -239,8 +246,10 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
         <span>合位移</span><b id="vstot">—</b><span class="u">mm</span>
         <span class="dir" id="vsdir">—</span>
       </div>
-      <div class="note"><span>帧源</span><b id="curCam">双目 · 未取帧</b></div>
       <div class="note"><span>板心</span><b id="vscenter">—</b></div>
+      <div class="note truth" id="realNote" title="板端 aruco/detection 原值单位是米(dx=纵向、dy=横向)，此处×1000显示成mm；板端只发分档值 0.01 / ±0.0555 / ±0.15，所以同一档内数值不变，属正常">
+        <span>真值</span><b id="realval">—</b><em class="age" id="realage"></em>
+      </div>
     </div>
     <div class="padwrap">
     <div class="padtip">选中圆微调</div>
@@ -486,10 +495,10 @@ function hitMarker(u,v){const d=ds();for(let i=marks.length-1;i>=0;i--)
   if(Math.hypot((u-marks[i].cx)*d,(v-marks[i].cy)*d)<62)return i;return -1}
 img.onload=()=>{spinner(false);off.width=img.width;off.height=img.height;octx.drawImage(img,0,0);marks=[];selected=-1;inlierIdx=[];fit();setStat('已标 0/4 孔','ok');
   const nm=frameSrc==='stereo'?'双目':'吊舱', want=frameSrc==='stereo'?[1536,1280]:[1280,720];
-  const cc=$('curCam'); if(cc) cc.textContent=nm+' '+img.width+'×'+img.height+(frameSrc==='stereo'?(img.width===want[0]?'':'（已按 1.2× 还原口径）'):' · 不出 mm');
-  let h = frameSrc==='stereo'
-    ? '已取帧（双目），点「检测圆」或手动点孔标注；dx/dy 按零位基准 (786.0, 560.0)、scale 0.8328 算'
-    : '已取帧（吊舱），只用于看图/标注；吊舱在云台上，角度或变焦一变 mm 就不准，纠偏值统一看双目帧';
+  const ph=$('ph'); if(ph) ph.classList.add('hide');
+  let h = nm+' '+img.width+'×'+img.height+(frameSrc==='stereo'
+      ? ' · 点「检测圆」或点图标注，dx/dy 按零位基准 (786.0,560.0)/0.8328 算'
+      : ' · 只看图/标注，不出 mm');
   if(img.width!==want[0]||img.height!==want[1]) h+=' ⚠️ 帧尺寸与常量口径不符，scale/参考点需按 '+img.width+'×'+img.height+' 重标';
   document.getElementById('hint').textContent=h;
   recompute()};
@@ -606,7 +615,21 @@ window.loadCompareFrame=function(url){
   spinner(true);setStat('取帧中…','busy');
   img.src = url.startsWith('data:') ? url : url+(url.includes('?')?'&':'?')+'t='+Date.now();
 };
-window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy}; // 真值将来来自 g20_status.json 文件
+window.setRealDxdy=function(dx,dy){window._realDx=dx;window._realDy=dy;window._realTs=Date.now()};
+/* 真值行：板端 aruco/detection 的 dx/dy 单位是米，这里×1000 显示成 mm；
+   板端只发分档值 0.01 / ±0.0555(0.05×1.11) / ±0.15，同一档内不变属正常；
+   >1.5s 没收到有效帧则标灰并显示停留时长（原来直接写底部提示条，30Hz 会把其它提示糊掉） */
+function renderReal(){
+  const b=document.getElementById('realval'), a=document.getElementById('realage'), n=document.getElementById('realNote');
+  if(!b||!n) return;
+  if(window._realDx==null || window._realDy==null){ b.textContent='—'; if(a)a.textContent=''; n.classList.remove('stale'); return; }
+  const age = window._realTs ? (Date.now()-window._realTs)/1000 : 999;
+  const stale = age > 1.5;
+  b.textContent = 'dx '+(window._realDx*1000).toFixed(1)+'  dy '+(window._realDy*1000).toFixed(1)+' mm';
+  if(a) a.textContent = stale ? (age>3600 ? '· 失联' : '· '+age.toFixed(age<10?1:0)+'s 未更新') : '· 实时';
+  n.classList.toggle('stale', stale);
+}
+setInterval(renderReal, 500);
 
 /* ============ MQTT 桥（App 内 ENABLE_MQTT 编译才可用） ============ */
 function startMqttFromConfig(){
@@ -672,8 +695,7 @@ window.onMqttMessage = function(topic, payload){
         if(parts.length>=2 && !isNaN(parts[0]) && !isNaN(parts[1])){dx=parts[0];dy=parts[1]}
       }
       if(!skipped && dx!=null && dy!=null){
-        setRealDxdy(dx, dy);
-        document.getElementById('hint').textContent = 'MQTT 真值: dx='+dx+'  dy='+dy;
+        setRealDxdy(dx, dy);   // 只更新「真值(板端)」行，不再占用底部提示条
       }
       return;
     }
