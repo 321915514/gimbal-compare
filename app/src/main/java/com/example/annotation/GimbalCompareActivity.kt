@@ -114,6 +114,37 @@ class GimbalCompareActivity : Activity() {
             }.start()
         }
 
+        /** 取板端 HTTP 接口（日志/诊断服务 logsvc），结果回 window.onHttpResult(tag, ok, body)
+         *  走原生请求而不是 JS fetch：页面是 file://，WebView 直连 http 会被 CORS 拦 */
+        @JavascriptInterface
+        fun httpGet(url: String, tag: String) {
+            Thread {
+                var ok = false
+                var body = ""
+                try {
+                    val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 15000
+                    conn.requestMethod = "GET"
+                    conn.setRequestProperty("Accept", "application/json")
+                    val code = conn.responseCode
+                    val st = if (code in 200..299) conn.inputStream else conn.errorStream
+                    body = st?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                    ok = code in 200..299
+                    if (!ok && body.isBlank()) body = "HTTP $code"
+                } catch (e: Exception) {
+                    body = "ERR:" + (e.message ?: e.toString())
+                }
+                val fok = ok
+                val fb = body
+                webView.post {
+                    webView.evaluateJavascript(
+                        "window.onHttpResult&&window.onHttpResult(${JSONObject.quote(tag)},$fok," +
+                        "${JSONObject.quote(fb)})", null)
+                }
+            }.start()
+        }
+
         private fun jsStr(s: String): String =
             "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ") + "\""
     }

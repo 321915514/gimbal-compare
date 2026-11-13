@@ -198,6 +198,36 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:10.5px;color:var(--muted);margin-left:auto;white-space:nowrap}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
 .legend .lg i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+/* ===== 板端日志 / 诊断页 ===== */
+#logMask{position:fixed;inset:0;background:rgba(3,6,14,.78);display:none;z-index:41}
+#logMask.show{display:block}
+#logMask .sheet{width:min(1120px,97vw);height:92vh;max-height:92vh}
+#logMask .sheet .head{gap:6px}
+#logMask .sheet .head .sp{flex:1}
+.logbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:7px 12px;
+  border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);flex:none}
+.logbar select,.logbar input{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  color:var(--fg);font-size:11.5px;padding:4px 7px;font-family:Consolas,monospace}
+.logbar input#logHost{width:140px}
+.logbar input#logQ{width:110px}
+.logbar button{cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--fg);
+  border-radius:8px;padding:4px 9px;font-size:11.5px}
+.logbar button.on{background:rgba(79,140,255,.22);border-color:var(--accent);color:#fff}
+#logStat{margin-left:auto;font-family:Consolas,monospace;font-size:11px;color:var(--muted)}
+#logOut{flex:1;min-height:0;overflow:auto;padding:8px 12px;font:11.5px/1.5 Consolas,monospace;
+  background:#05070f;white-space:pre-wrap;word-break:break-all}
+#logOut div{white-space:pre-wrap;padding:0}
+#logOut .lv-error{color:#ff6b6b}
+#logOut .lv-warn{color:#f5a623}
+#logOut .lv-debug{color:#79879f}
+#diagOut{flex:1;min-height:0;overflow:auto;padding:10px 12px;font-size:12px;line-height:1.6;display:none}
+#diagOut .row2{display:flex;gap:8px;border-bottom:1px solid rgba(34,48,77,.55);padding:3px 0}
+#diagOut .k{width:104px;color:var(--muted);flex:none}
+#diagOut .v{flex:1;font-family:Consolas,monospace;word-break:break-all}
+#diagOut .ok{color:#2ecc71}#diagOut .bad{color:#ff5d5d}
+#diagOut .sec2{margin:8px 0 3px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px}
+#diagOut .warnbox{background:rgba(255,93,93,.1);border:1px solid rgba(255,93,93,.42);border-radius:8px;
+  padding:6px 9px;margin:4px 0;color:#ffb3b3;font-size:11.5px;font-family:Consolas,monospace}
 </style>
 <script src="config.js"></script>
 </head>
@@ -217,6 +247,7 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
     <button class="act ghost" id="undo">撤销</button>
     <button class="act ghost" id="clear">清空</button>
     <button class="act ghost" id="btnSettings" title="设置">⚙️</button>
+    <button class="act ghost" id="btnLog" title="板端日志/诊断">📜</button>
     <button class="act" id="fetchFrame" style="display:none">📷 获取帧</button>
     <div class="legend">
       <span class="lg"><i style="background:#22c55e"></i>计算用</span>
@@ -317,6 +348,43 @@ header .t{background:linear-gradient(135deg,#fff 35%,#8ab4ff);-webkit-background
       <div id="stOut">点「开始自测」逐项检查：配置格式 → MQTT 连接 → 双目取帧往返 → 真值/校准话题 → 画面与存储</div>
     </div>
     <div class="foot"><button class="bt pri" id="setSave">保存并应用</button></div>
+  </div>
+</div>
+
+<!-- ===== 板端日志 / 诊断（现场无外网时走 144 网看板子日志） ===== -->
+<div id="logMask">
+  <div class="sheet">
+    <div class="head">
+      <span>📜 板端日志 / 诊断</span>
+      <button class="bt" id="logTabLog">日志</button>
+      <button class="bt" id="logTabDiag">诊断</button>
+      <button class="bt" id="logClose">关闭</button>
+    </div>
+    <div class="logbar">
+      <span>板子</span>
+      <input id="logHost" placeholder="192.168.144.118" title="板子 eth0 地址（144 网）；现场没无线网就走这个">
+      <input id="logPort" value="8088" style="width:58px" title="板端 logsvc 端口，默认 8088">
+      <select id="logSrc" title="日志来源">
+        <option value="main">主程序日志</option>
+        <option value="journal">主程序控制台</option>
+        <option value="land">飞控桥 land_control</option>
+        <option value="emqx">EMQX</option>
+      </select>
+      <select id="logLv" title="级别过滤">
+        <option value="all">全部</option>
+        <option value="info">info 及以上</option>
+        <option value="warn">只看警告/错误</option>
+        <option value="error">只看错误</option>
+      </select>
+      <input id="logQ" placeholder="关键字" title="按关键字过滤，如 检测结果 / 角度 / error">
+      <button id="logRefresh">刷新</button>
+      <button id="logAuto">自动:关</button>
+      <button id="logNewest">最新</button>
+      <button id="logClear">清屏</button>
+      <span id="logStat">—</span>
+    </div>
+    <div id="logOut">点「刷新」拉取板端日志；板子地址默认取 MQTT broker 的 IP（144 网）</div>
+    <div id="diagOut"></div>
   </div>
 </div>
 
@@ -1003,6 +1071,173 @@ loadExternalConfig();
   const kick=()=>{ h.classList.add('show'); clearTimeout(t); t=setTimeout(()=>h.classList.remove('show'),3500); };
   new MutationObserver(kick).observe(h,{childList:true,characterData:true,subtree:true});
   kick();
+})();
+/* ================= 板端日志 / 诊断（现场无外网走 144 网） ================= */
+(function(){
+  const $=id=>document.getElementById(id);
+  const K_HOST='gimbal_log_host', K_PORT='gimbal_log_port', K_AUTO='gimbal_log_auto';
+  let since=0, autoTimer=null, busy=false, seq=0, waiters={}, curTab='log';
+  const hostOf=v=>String(v||'').trim().replace(/^https?:\/\//i,'').replace(/\/.*$/,'');
+  function defaultHost(){
+    try{ const m=/\/\/([0-9.]+)/.exec(cfgGet('mqtt.broker')||''); if(m) return m[1]; }catch(e){}
+    return '192.168.144.118';
+  }
+  /* 原生 WebView 用 file:// 加载页面，JS 直连 http 会被 CORS 拦，所以走 Kotlin 桥 */
+  window.onHttpResult=function(tag,ok,body){
+    const w=waiters[tag]; if(!w) return; delete waiters[tag];
+    if(ok) w.res(String(body==null?'':body));
+    else w.rej(new Error(String(body||'').replace(/^ERR:/,'')||'请求失败'));
+  };
+  function httpGet(url){
+    return new Promise((res,rej)=>{
+      const G=window.G20||window.Android||null;
+      if(!G||!G.httpGet){ rej(new Error('这个 APK 还不支持取日志，需要装带 httpGet 的新版')); return; }
+      const tag='h'+(++seq);
+      const timer=setTimeout(()=>{ if(waiters[tag]){ delete waiters[tag]; rej(new Error('超时 20s（板子不可达或端口被挡）')); } },20000);
+      waiters[tag]={res:v=>{clearTimeout(timer);res(v);}, rej:e=>{clearTimeout(timer);rej(e);}};
+      try{ G.httpGet(url,tag); }catch(e){ clearTimeout(timer); delete waiters[tag]; rej(e); }
+    });
+  }
+  const api=()=>'http://'+hostOf($('logHost').value||defaultHost())+':'+(parseInt($('logPort').value,10)||8088);
+
+  function lvClass(s){
+    const t=String(s).toLowerCase();
+    if(/\[error\]|\[fatal\]|error|failed|失败|异常|断开|超时/.test(t)) return 'lv-error';
+    if(/\[warn/.test(t)||/\bwarning\b/.test(t)) return 'lv-warn';
+    if(/\[debug\]/.test(t)) return 'lv-debug';
+    return '';
+  }
+  function append(lines){
+    const box=$('logOut');
+    const nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<48;
+    const frag=document.createDocumentFragment();
+    lines.forEach(l=>{ const d=document.createElement('div'); const c=lvClass(l); if(c) d.className=c; d.textContent=l; frag.appendChild(d); });
+    box.appendChild(frag);
+    while(box.childElementCount>4000) box.removeChild(box.firstChild);
+    if(nearBottom) box.scrollTop=box.scrollHeight;
+  }
+  async function loadLog(reset){
+    if(busy) return; busy=true;
+    if(reset){ since=0; $('logOut').innerHTML=''; }
+    const url=api()+'/api/log?src='+encodeURIComponent($('logSrc').value)
+      +'&n='+(reset?300:400)+'&since='+since
+      +'&level='+encodeURIComponent($('logLv').value)
+      +'&q='+encodeURIComponent($('logQ').value.trim());
+    try{
+      const d=JSON.parse(await httpGet(url));
+      if(d.error){ $('logStat').textContent='板子: '+d.error; }
+      else{
+        since=d.next||0;
+        const lines=d.lines||[]; append(lines);
+        const age=d.age_s!=null?(d.age_s<90?' · '+d.age_s.toFixed(0)+'s 前有写入':' · ⚠ '+Math.round(d.age_s/60)+' 分钟没写入'):'';
+        $('logStat').textContent=(d.src||'')+' · '+((d.size||0)/1024).toFixed(0)+'KB · '+lines.length+' 行'+age;
+      }
+    }catch(e){
+      $('logStat').textContent='连不上 '+api();
+      append(['[app] 拉日志失败: '+(e.message||e)+'  ← 检查：板子 144 网 IP / 8088 端口 / 网线']);
+    }finally{ busy=false; }
+  }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function rows(arr){ return arr.map(r=>'<div class="row2"><div class="k">'+esc(r[0])+'</div><div class="v'+(r[2]?' '+r[2]:'')+'">'+esc(r[1])+'</div></div>').join(''); }
+  function fmtUp(s){ s=Math.floor(s||0); const d=Math.floor(s/86400), h=Math.floor(s%86400/3600), m=Math.floor(s%3600/60);
+    return (d?d+'天':'')+(h?h+'小时':'')+(m?m+'分':'')+(s%60+'秒'); }
+  function renderDiag(d){
+    let h='';
+    if((d.warn||[]).length) h+=(d.warn||[]).map(w=>'<div class="warnbox">⚠ '+esc(w)+'</div>').join('');
+    else h+='<div class="row2"><div class="k">结论</div><div class="v ok">没发现明显异常</div></div>';
+    h+='<div class="sec2">系统</div>';
+    const mi=d.mem||{}, temps=(d.temp_c||[]).join('/')+'°C';
+    h+=rows([
+      ['板子时钟', (d.clock||'?')+'  (板子无 RTC，时间不可信，只看先后顺序)'],
+      ['运行时长', fmtUp(d.uptime_s)],
+      ['负载', d.load||'—'],
+      ['内存', mi.total_mb?('用 '+mi.used_pct+'%（剩 '+mi.avail_mb+'/'+mi.total_mb+'MB）'):'—'],
+      ['磁盘 /', d.disk||'—'],
+      ['温度', temps+'  '+(d.temp_names||[]).join(',')],
+      ['logsvc', 'v'+(d.ver||'?')]
+    ]);
+    h+='<div class="sec2">服务</div>';
+    h+=rows((d.units||[]).map(u=>[u.name, u.active+'/'+u.sub+(u.restarts?('  重启'+u.restarts+'次'):'')+(u.since?'  自 '+u.since.split(' ')[1]||'':''), u.active==='active'?'ok':'bad']));
+    h+='<div class="sec2">网络</div>';
+    h+=rows((d.net||[]).map(n=>[n.name, (n.ipv4||'无IP')+'  '+n.state+(n.carrier?' 载波正常':' 无载波'), n.ipv4&&n.carrier?'ok':'bad']));
+    h+='<div class="sec2">连通性探测</div>';
+    h+=rows((d.probes||[]).map(p=>[p.name, p.addr+'  '+(p.ok?('通 '+(p.ms|0)+'ms'):('不通 '+(p.err||''))), p.ok?'ok':'bad']));
+    h+='<div class="sec2">日志</div>';
+    const L=d.log||{}, S=(d.sources||{}).main||{};
+    h+=rows([
+      ['主程序日志', S.error?('读不到: '+S.error):(((S.size||0)/1024).toFixed(0)+'KB'+(S.age_s!=null?('  最后写入 '+S.age_s+'s 前'):''))],
+      ['最近检测', L.last_detect||'（没有“检测结果”行）'],
+      ['最近角度', L.last_angle||'—'],
+      ['最近推理', L.last_infer||'—'],
+      ['最近流程', L.last_calib||'—'],
+      ['最近错误', L.last_error||'（无）', L.last_error?'bad':'ok']
+    ]);
+    if(d.mqtt){
+      const m=d.mqtt; h+='<div class="sec2">MQTT 实况 aruco/detection（抓 3 秒）</div>';
+      if(m.error) h+=rows([['状态','连不上 broker: '+m.error,'bad']]);
+      else h+=rows([
+        ['3 秒收到', (m.count||0)+' 条'+(m.count?('，其中 valid '+(m.valid||0)+' 条'):''), (m.count?((m.valid||0)>0?'ok':'bad'):'bad')],
+        ['最新报文', (m.last&&m.last.payload)||'（无）']
+      ])+(m.samples&&m.samples.length?rows(m.samples.map((s,i)=>['样例'+(i+1), JSON.stringify(s)])):'');
+    }
+    return h;
+  }
+  async function loadDiag(){
+    $('diagOut').innerHTML='<div class="sec2">抓取中…（含 MQTT 抓 3 秒真值，约 3~5 秒）</div>';
+    try{
+      const d=JSON.parse(await httpGet(api()+'/api/diag?mqtt=1'));
+      $('diagOut').innerHTML=renderDiag(d);
+    }catch(e){
+      $('diagOut').innerHTML='<div class="warnbox">诊断失败：'+esc(e.message||e)+'</div>'
+        +'<div class="sec2">现场排查顺序</div>'
+        +rows([['1 网络','板子跑 ip -4 addr，看 eth0 有没有 144 网地址；网线两端灯'],['2 服务','systemctl is-active yolov8seg land_control emqx'],
+               ['3 取流','吊舱 RTSP 192.168.144.25:8554 是否通'],['4 算法','主程序日志里 “检测结果 hole=” 是几'],
+               ['5 发布','本页 日志→主程序日志 搜 aruco/detection']]);
+    }
+  }
+  function setTab(t){
+    curTab=t; const isLog=t==='log';
+    $('logOut').style.display=isLog?'block':'none';
+    $('diagOut').style.display=isLog?'none':'block';
+    $('logTabLog').classList.toggle('on',isLog);
+    $('logTabDiag').classList.toggle('on',!isLog);
+    document.querySelector('#logMask .logbar').style.display=isLog?'flex':'none';
+    if(!isLog) loadDiag();
+  }
+  function setAuto(on){
+    if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+    if(on) autoTimer=setInterval(()=>{ if(curTab==='log') loadLog(false); },2000);
+    $('logAuto').classList.toggle('on',!!on);
+    $('logAuto').textContent='自动:'+(on?'开':'关');
+    try{ localStorage.setItem(K_AUTO,on?'1':'0'); }catch(e){}
+  }
+  function openLog(){
+    try{
+      $('logHost').value=localStorage.getItem(K_HOST)||defaultHost();
+      $('logPort').value=localStorage.getItem(K_PORT)||'8088';
+    }catch(e){ if(!$('logHost').value) $('logHost').value=defaultHost(); }
+    document.getElementById('logMask').classList.add('show');
+    setTab('log'); loadLog(true);
+    let a=false; try{ a=localStorage.getItem(K_AUTO)==='1'; }catch(e){}
+    if(a) setAuto(true);
+  }
+  function closeLog(){ setAuto(false); document.getElementById('logMask').classList.remove('show'); }
+
+  const on=(id,ev,fn)=>{ const e=$(id); if(e) e.addEventListener(ev,fn); };
+  on('btnLog','click',openLog);
+  on('logClose','click',closeLog);
+  on('logTabLog','click',()=>setTab('log'));
+  on('logTabDiag','click',()=>setTab('diag'));
+  on('logRefresh','click',()=>loadLog(true));
+  on('logAuto','click',()=>setAuto(!autoTimer));
+  on('logNewest','click',()=>{ const b=$('logOut'); b.scrollTop=b.scrollHeight; });
+  on('logClear','click',()=>{ since=0; $('logOut').innerHTML=''; $('logStat').textContent='—'; });
+  on('logSrc','change',()=>loadLog(true));
+  on('logLv','change',()=>loadLog(true));
+  on('logQ','change',()=>loadLog(true));
+  on('logHost','change',()=>{ try{ localStorage.setItem(K_HOST,hostOf($('logHost').value)); }catch(e){} loadLog(true); });
+  on('logPort','change',()=>{ try{ localStorage.setItem(K_PORT,$('logPort').value); }catch(e){} loadLog(true); });
+  window.__openLog=openLog;
 })();
 </script>
 </body>
