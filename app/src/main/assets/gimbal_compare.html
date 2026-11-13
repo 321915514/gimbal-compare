@@ -759,6 +759,20 @@ function sendReset(){
   resetBtnSet('⏳ 复位中', true);
   const h=document.getElementById('hint'); if(h) h.textContent='已发复位指令到 '+topic+'，等 aruco/reset/complete=1 解锁';
 }
+/* 收到 aruco/reset/complete=1：解锁 + 明确提示 */
+function _onResetComplete(){
+  window._resetDoneTs = Date.now();
+  window._resetAcked  = true;
+  window._resetLocked = false;
+  const btn=document.getElementById('resetBtn');
+  if(btn) btn.textContent='🏠 复位';
+  updateResetGate();
+  setResetText('复位完成','good');
+  const a=document.getElementById('resetage');
+  if(a) a.textContent='· 刚刚回执';
+  const h=document.getElementById('hint');
+  if(h) h.textContent='✅ 复位完成（aruco/reset/complete=1）';
+}
 function renderReset(){
   const b=document.getElementById('resetval'), a=document.getElementById('resetage');
   if(!b) return;
@@ -767,7 +781,7 @@ function renderReset(){
   if(!sent){ if(!b.textContent) setResetText('—'); return; }
   if(done){
     const age=(now-done)/1000;
-    b.textContent='完成'; b.className = age<12 ? 'good' : '';
+    b.textContent='复位完成'; b.className = age<12 ? 'good' : '';
     if(a) a.textContent='· '+Math.floor(age)+'s 前回执';
     return;
   }
@@ -820,21 +834,9 @@ window.onMqttMessage = function(topic, payload){
       const o = JSON.parse(payload);
       const st = (o.status!=null) ? +o.status : (+payload||0);
       window._resetRecvTs = Date.now();
-      if(st === 1){
-        window._resetDoneTs = Date.now();
-        window._resetAcked = true;
-        window._resetLocked = false;
-        const btn=document.getElementById('resetBtn');
-        if(btn){ btn.textContent='🏠 复位'; }
-        updateResetGate();
-      }
+      if(st === 1){ _onResetComplete(); }
     }catch(e){
-      if(String(payload).trim()==='1'){
-        window._resetDoneTs=Date.now(); window._resetAcked=true; window._resetLocked=false;
-        const btn=document.getElementById('resetBtn');
-        if(btn){ btn.textContent='🏠 复位'; }
-        updateResetGate();
-      }
+      if(String(payload).trim()==='1'){ _onResetComplete(); }
     }
     return;
   }
