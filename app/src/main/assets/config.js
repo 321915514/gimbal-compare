@@ -38,7 +38,9 @@ window.GIMBAL_CONFIG = {
     subscribe: "gimbal/real_dxdy,aruco/detection",   // 真值+检测结果（aruco/manual/request 由常驻服务订阅，见 MqttForegroundService）
     publish: "gimbal/result",               // dx/dy 结果（发布=发）
     calibCmd: "aruco/stop",                 // 校准命令（发布=发，点「校准」发 {"cmd":"calibrate"}）
-    calibStatus: "aruco/calibrate/status",  // 校准状态（订阅=收，收 {"status":0/1/2} 显示）
+    calibStatus: "aruco/calibrate/status",
+    resetCmd: "aruco/reset",               // 复位命令（发布=发 {"cmd":"reset"}）
+    resetComplete: "aruco/reset/complete", // 复位回执（订阅=收 {"status":1}=已复位，板端持续10s）  // 校准状态（订阅=收，收 {"status":0/1/2} 显示）
     stereoGrab: "stereo/grab",              // 请求双目图（发布=发 {"cmd":"grab"}）
     stereoImage: "stereo/image",            // 双目图返回（订阅=收 {"img":"base64"}）
     manualReq: "aruco/manual/request",      // 人工标注请求（订阅=收：自动校准失败，板端请求人工标注）
