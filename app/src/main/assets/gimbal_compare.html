@@ -933,13 +933,16 @@ function updateCalibButton(state){
   else if(state === 2){ btn.textContent='✅ 已校准'; btn.disabled=false; }
   else { btn.textContent='🎯 校准'; btn.disabled=false; }
 }
-/* 校准：记下当前四孔中心为参考点 + 发布 cmd=calibrate 到 aruco/stop 给板端 */
+/* 校准（2026-11-13 用户定）：点「校准」= 让板端重跑一次二次校准，发 aruco/stop {"cmd":"calibrate"}；
+   双目帧 / 吊舱帧行为一致（板端用自己的深度相机值，不读 App 帧）。
+   不再改写 App 本地参考点 —— 基准恒为零位 (786.0,560.0)/0.8328，与板端 hole_hybrid.cc 同值，
+   避免"点一次校准基准就跑掉、和板子对不上"。 */
 function calibrate(){
   if(calibState === 1){ document.getElementById('hint').textContent='校准中，请稍候'; return; }
   // 人工补标模式：回传标注点（aruco/manual），不是发自动校准命令（aruco/stop）
   if(manualPending){
-    if(inlierIdx.length < 4){
-      document.getElementById('hint').textContent='未标满 4 个孔，无法回传';
+    if(inlierIdx.length < 3){
+      document.getElementById('hint').textContent='未标满 3 个孔（3 点按对角线中点算），无法回传';
       return;
     }
     // 坐标还原：双目帧被降采样到 1280 宽显示，板端要 1536×1280 原图坐标
@@ -951,53 +954,33 @@ function calibrate(){
       y: Math.round(marks[i].cy*sy*10)/10,
       r: Math.round((marks[i].r||0)*sx)
     }));
-    const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-    if(mcfg && mcfg.manualResp) mqttPublish(mcfg.manualResp, JSON.stringify({image_id: manualPending.image_id||'', points: points}));
+    const mcfg0=(window.GIMBAL_CONFIG||{}).mqtt;
+    if(mcfg0 && mcfg0.manualResp) mqttPublish(mcfg0.manualResp, JSON.stringify({image_id: manualPending.image_id||'', points: points}));
     document.getElementById('hint').textContent='已回传人工标注（'+points.length+' 孔）';
     setStat('已回传人工标注','ok');
     manualPending = null;
-    const btn=document.getElementById('calibrate');
-    if(btn){btn.textContent='🎯 校准';}
+    const btn0=document.getElementById('calibrate');
+    if(btn0){btn0.textContent='🎯 校准';}
     recompute();
     return;
   }
-  // 吊舱帧不出 mm(POD_MM=false)：不改吊舱基准（写了也没 mm 用它），但仍允许触发板端二次校准——
-  // 板端用的是它自己的深度相机值，不读吊舱帧，所以这条命令本身是安全的
-  const podNoMm = (frameSrc!=='stereo' && !POD_MM);
-  if(inlierIdx.length < 4){
-    document.getElementById('hint').textContent='未标满 4 个孔，无法校准';
+  // 门槛与计算一致：3 孔即可（3 点取对角线中点，同板端 hole_hybrid.cc:385-394）
+  if(inlierIdx.length < 3){
+    document.getElementById('hint').textContent='未标满 3 个孔，无法校准';
     return;
   }
-  if(!podNoMm && (lastDx == null || lastDy == null)){
-    document.getElementById('hint').textContent='dx/dy 未计算，请先标注四孔再校准';
-    return;
-  }
-  // 与 recompute 同口径：对角线交点(4点/3点)，再还原到标定分辨率(双目 1536×1280 / 吊舱 1280×720)
-  const rr = robustCentroid(inlierIdx.map(i=>({x:marks[i].cx,y:marks[i].cy})));
-  if(!rr){document.getElementById('hint').textContent='四孔退化，取不到中心';return}
-  const NX = frameSrc==='stereo'?1536:1280, NY = frameSrc==='stereo'?1280:720;
-  const kx = (img.width>0)? NX/img.width : 1, ky = (img.height>0)? NY/img.height : 1;
-  const cx = rr.cx*kx, cy = rr.cy*ky;
-  // 校准写的是「当前帧来源」那套常量（吊舱帧→吊舱基准，双目帧→双目基准），分开存；吊舱帧不出 mm 就不写
-  if(!podNoMm){
-  if(frameSrc==='stereo'){ ST_REF_X=cx; ST_REF_Y=cy; stCalibrated=true;
-    try{ localStorage.setItem('stereo_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
-  else { REF_X=cx; REF_Y=cy; calibrated=true;
-    try{ localStorage.setItem('gimbal_ref', JSON.stringify({x:cx, y:cy})); }catch(e){} }
-  }
-  if(frameSrc==='stereo'){
-    // 双目基准是 App 本地量，不通知板端、不锁 UI（板端 calibrate 会动平台，危险）
-    document.getElementById('hint').textContent='双目基准已就地保存 ('+cx.toFixed(1)+','+cy.toFixed(1)+') px —— 本地生效，未通知板端';
-    recompute(); return;
-  }
-  // 发送校准命令给板端（发布到 aruco/stop）
   const mcfg=(window.GIMBAL_CONFIG||{}).mqtt;
-  if(mcfg && mcfg.calibCmd) mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
-  updateCalibButton(1);  // 立即置「校准中」禁点
-  lockUIFor(60000, '⏳ 校准中，请稍候…');   // 校准期间全局锁定，收到完成/失败状态或 60s 超时解锁
-  document.getElementById('hint').textContent = podNoMm
-    ? '已触发板端二次校准（板端用自己的深度相机值；吊舱帧不出 mm，参考点未改）'
-    : '已校准，参考点 ('+cx.toFixed(1)+','+cy.toFixed(1)+')';
+  if(!(mcfg && mcfg.calibCmd)){
+    document.getElementById('hint').textContent='未配置 calibCmd，无法触发板端校准';
+    return;
+  }
+  mqttPublish(mcfg.calibCmd, JSON.stringify({cmd:"calibrate"}));
+  updateCalibButton(1);                       // 立即置「校准中」禁点
+  lockUIFor(60000, '⏳ 校准中，请稍候…');       // 收到 aruco/calibrate/status 或 60s 超时解锁
+  setStat('已发送校准命令','ok');
+  document.getElementById('hint').textContent = '已触发板端二次校准（'+(frameSrc==='stereo'?'双目':'吊舱')
+    +'帧）—— 板端用深度相机自己的值；App 参考点未改，仍为零位 ('
+    +ST_REF_X.toFixed(1)+','+ST_REF_Y.toFixed(1)+') px';
   recompute();
 }
 
@@ -1012,12 +995,12 @@ function applyConfig(){
   if(CFG.stereoRefX!=null)ST_REF_X=CFG.stereoRefX;
   if(CFG.stereoRefY!=null)ST_REF_Y=CFG.stereoRefY;
   if(CFG.stereoScale!=null)ST_SCALE=CFG.stereoScale;
-  // 恢复已保存的校准参考点（吊舱 / 双目 分开）
+  // 2026-11-13：不再用 localStorage 里的旧基准覆盖零位常量（双目点「校准」已改为只触发板端二次校准，
+  // 不再写本地参考点）。histro 里残留的 stereo_ref 一律忽略，保证 App 与板端恒为 (786.0,560.0)/0.8328。
+  try{ const t=localStorage.getItem('stereo_ref'); if(t) localStorage.removeItem('stereo_ref'); }catch(e){}
   try{
     const s=localStorage.getItem('gimbal_ref');
     if(s){const o=JSON.parse(s);if(o.x!=null&&o.y!=null){REF_X=o.x;REF_Y=o.y;calibrated=true;}}
-    const t=localStorage.getItem('stereo_ref');
-    if(t){const o=JSON.parse(t);if(o.x!=null&&o.y!=null){ST_REF_X=o.x;ST_REF_Y=o.y;stCalibrated=true;}}
   }catch(e){}
   recompute();
   try{ window.__takeManual && window.__takeManual(); }catch(e){}   // 冷启动：取走服务暂存的标注请求
@@ -1075,7 +1058,7 @@ function openSettings(){
   const ref=document.getElementById('setRef');
   if(ref) ref.textContent='吊舱参考点 ('+Number(REF_X).toFixed(1)+', '+Number(REF_Y).toFixed(1)+')'+(calibrated?'（已校准）':'（默认）')+' · scale '+Number(SCALE).toFixed(3)+' mm/px';
   const sr=document.getElementById('stRef');
-  if(sr) sr.textContent='双目参考点 ('+Number(ST_REF_X).toFixed(1)+', '+Number(ST_REF_Y).toFixed(1)+')'+(stCalibrated?'（已校准）':'（默认）')+' · scale '+Number(ST_SCALE).toFixed(3)+' mm/px';
+  if(sr) sr.textContent='双目参考点 ('+Number(ST_REF_X).toFixed(1)+', '+Number(ST_REF_Y).toFixed(1)+')'+(stCalibrated?'（已校准）':'（零位）')+' · scale '+Number(ST_SCALE).toFixed(3)+' mm/px';
   const ps=document.getElementById('podScaleVal'); if(ps) ps.textContent=Number(SCALE).toFixed(3);
   const sv=document.getElementById('stereoScaleVal'); if(sv) sv.textContent=Number(ST_SCALE).toFixed(3);
   try{ refreshLiveConn(); }catch(e){}
