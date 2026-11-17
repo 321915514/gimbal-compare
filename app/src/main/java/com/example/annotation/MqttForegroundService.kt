@@ -22,6 +22,11 @@ class MqttForegroundService : Service() {
     private var worker: Thread? = null
     @Volatile private var running = false
     private val topic = "aruco/manual/request"
+    // 时间同步：板子无 RTC、无外网，以本机（G20，有 4G/GPS 自动授时）为时间源。
+    // 板端发 g20/time/req{"seq":N}，这里回 g20/time/rsp 带 NTP 四时间戳（t2=收到、t3=发出）。
+    private val topicTimeReq = "g20/time/req"
+    private val topicTimeRsp = "g20/time/rsp"
+    private val subs = "$topic,$topicTimeReq"
 
     override fun onCreate() {
         super.onCreate()
@@ -79,9 +84,12 @@ class MqttForegroundService : Service() {
                 .getDeclaredConstructor().newInstance() as IMqttBridge
         } catch (_: Exception) { return false }
         bridge = b
-        b.start(brokerCsv, clientId, topic, object : IMqttListener {
+        b.start(brokerCsv, clientId, subs, object : IMqttListener {
             override fun onMessage(t: String, payload: String) {
-                if (t == topic) wakeApp(payload)
+                when (t) {
+                    topic -> wakeApp(payload)
+                    topicTimeReq -> answerTimeSync(payload)
+                }
             }
         })
         sleepQuiet(3500)
@@ -116,6 +124,22 @@ class MqttForegroundService : Service() {
             .setAutoCancel(true)
             .build()
         try { getSystemService(NotificationManager::class.java)?.notify(100, notif) } catch (_: Exception) {}
+    }
+
+    /**
+     * 应答板端对时请求：回一条带 NTP 四时间戳的 rsp。
+     * t2 = 收到的时刻、t3 = 发出的时刻（都是本机时钟，Android 有自动网络授时，是现场唯一准的表）。
+     * 板端据此算 offset=((t2-t1)+(t3-t4))/2、delay=(t4-t1)-(t3-t2)，一次把时钟摆正。
+     */
+    private fun answerTimeSync(payload: String) {
+        val t2 = System.currentTimeMillis()
+        var seq = 0L
+        try { seq = org.json.JSONObject(payload).optLong("seq", 0L) } catch (_: Exception) {}
+        val t3 = System.currentTimeMillis()
+        val rsp = "{\"seq\":" + seq + ",\"epoch_ms\":" + t3 + ",\"t2_ms\":" + t2 +
+                ",\"t3_ms\":" + t3 + ",\"from\":\"g20-android\"}"
+        bridge?.publish(topicTimeRsp, rsp)
+        android.util.Log.d("TimeSync", "rsp seq=$seq t2=$t2 t3=$t3")
     }
 
     private fun sleepQuiet(ms: Long) { try { Thread.sleep(ms) } catch (_: InterruptedException) {} }
